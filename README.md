@@ -1,4 +1,4 @@
-# Truco na Escola
+# Truco Paulista 
 
 Truco Paulista multiplayer para sala de aula.
 

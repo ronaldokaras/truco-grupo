@@ -23,20 +23,6 @@ npm start
 
 Abra http://localhost:3000
 
-## Deploy no Render
-
-1. Suba o projeto para o GitHub
-2. Em [render.com](https://render.com) → **New** → **Web Service**
-3. Conecte o repositório
-4. Configurações:
-   - **Runtime**: Node
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-5. Crie o serviço
-6. Use o link gerado (ex: `https://truco-na-escola.onrender.com`)
-
-> No plano gratuito o serviço “dorme” após ~15 min sem uso. O primeiro acesso pode demorar ~30–50s para acordar.
-
 ## Como jogar
 
 1. Um aluno cria a sala e escolhe 1v1 ou Duplas

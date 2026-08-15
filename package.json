@@ -4,7 +4,8 @@
   "description": "Truco Paulista multiplayer - Trucou!",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "jest"
   },
   "engines": {
     "node": ">=18"

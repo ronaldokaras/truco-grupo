@@ -3,11 +3,12 @@ venv/
 env/
 .env/
 
-# Arquivos do Python
+# Arquivos
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.log
 
 # Banco de dados SQLite
 *.db
@@ -15,6 +16,7 @@ __pycache__/
 # Arquivos de configuração sensíveis
 instance/
 .env
+node_modules/
 
 # Sistema operacional
 .DS_Store

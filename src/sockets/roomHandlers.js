@@ -8,6 +8,7 @@
  */
 
 const { sanitizeName, generateToken } = require('../utils/helpers');
+const { isValidName, isValidRoomCode } = require('../utils/validators');
 const { sendStateToRoom, emitRoomMessage } = require('./utils');
 
 module.exports = function roomHandlers(io, socket, roomManager) {
@@ -57,12 +58,16 @@ module.exports = function roomHandlers(io, socket, roomManager) {
   };
 
   socket.on('createRoom', ({ mode, name }) => {
-    const cleanName = sanitizeName(name, null);
-    if (!cleanName) {
-      socket.emit('toast', 'Digite um nome válido.');
+    if (!isValidName(name)) {
+      socket.emit('toast', 'Digite um nome válido (1 a 18 caracteres).');
+      return;
+    }
+    if (mode !== '1v1' && mode !== 'duplas') {
+      socket.emit('toast', 'Modo inválido.');
       return;
     }
 
+    const cleanName = sanitizeName(name, null);
     const room = roomManager.createRoom(mode);
     const token = generateToken();
 
@@ -86,6 +91,15 @@ module.exports = function roomHandlers(io, socket, roomManager) {
 
   socket.on('joinRoom', ({ code, name }) => {
     const roomCode = (code || '').toUpperCase().trim();
+    if (!isValidRoomCode(roomCode)) {
+      socket.emit('toast', 'Código de sala inválido.');
+      return;
+    }
+    if (!isValidName(name)) {
+      socket.emit('toast', 'Digite um nome válido (1 a 18 caracteres).');
+      return;
+    }
+
     const room = roomManager.getRoom(roomCode);
     if (!room) {
       socket.emit('toast', 'Sala não encontrada. Verifique o código.');
@@ -93,11 +107,6 @@ module.exports = function roomHandlers(io, socket, roomManager) {
     }
 
     const cleanName = sanitizeName(name, null);
-    if (!cleanName) {
-      socket.emit('toast', 'Digite um nome válido.');
-      return;
-    }
-
     const freeSlot = room.game.players.findIndex(p => !p.connected);
     if (freeSlot === -1) {
       socket.name = cleanName;
@@ -139,8 +148,13 @@ module.exports = function roomHandlers(io, socket, roomManager) {
 
   socket.on('reconnectRoom', ({ code, token }) => {
     const roomCode = (code || '').toUpperCase().trim();
+    if (!isValidRoomCode(roomCode) || !token) {
+      socket.emit('reconnectFailed');
+      return;
+    }
+
     const room = roomManager.getRoom(roomCode);
-    if (!room || !token) {
+    if (!room) {
       socket.emit('reconnectFailed');
       return;
     }

@@ -1,12 +1,20 @@
 /**
  * Handler para mensagens de chat.
  * Identifica o remetente (jogador ou espectador) e emite a mensagem para todos na sala.
+ * Aplica sanitização e limite de taxa.
  */
 
-module.exports = function chatHandlers(io, socket, roomManager) {
+const { sanitizeMessage } = require('../utils/validators');
+
+module.exports = function chatHandlers(io, socket, roomManager, chatLimiter) {
   socket.on('chatMessage', (data) => {
-    const { message } = data;
-    if (!message || message.trim() === '') return;
+    if (!chatLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Você está enviando mensagens muito rápido.');
+      return;
+    }
+
+    const message = sanitizeMessage(data.message);
+    if (!message) return;
 
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
@@ -23,7 +31,7 @@ module.exports = function chatHandlers(io, socket, roomManager) {
 
     io.to(room.code).emit('chatMessage', {
       name,
-      message: message.trim(),
+      message,
       isSpectator
     });
   });

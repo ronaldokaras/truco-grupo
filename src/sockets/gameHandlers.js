@@ -12,9 +12,19 @@
 
 const { TRUCO_LEVEL_NAMES } = require('../game/constants');
 const { sendStateToRoom, emitRoomMessage } = require('./utils');
+const { isValidCard, isValidTrucoResponse } = require('../utils/validators');
 
-module.exports = function gameHandlers(io, socket, roomManager) {
+module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
   socket.on('playCard', (card) => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      return;
+    }
+    if (!isValidCard(card)) {
+      socket.emit('toast', 'Carta inválida.');
+      return;
+    }
+
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const playerIndex = roomManager.findPlayerIndex(room, socket.id);
@@ -36,6 +46,11 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('truco', () => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      return;
+    }
+
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const playerIndex = roomManager.findPlayerIndex(room, socket.id);
@@ -58,6 +73,15 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('respondTruco', (response) => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      return;
+    }
+    if (!isValidTrucoResponse(response)) {
+      socket.emit('toast', 'Resposta inválida.');
+      return;
+    }
+
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const playerIndex = roomManager.findPlayerIndex(room, socket.id);
@@ -80,6 +104,7 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('nextHand', () => {
+    if (!actionLimiter.isAllowed(socket.id)) return;
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const game = room.game;
@@ -98,6 +123,7 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('restart', () => {
+    if (!actionLimiter.isAllowed(socket.id)) return;
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const game = room.game;
@@ -117,6 +143,11 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('startGame', ({ timeLimit }) => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      return;
+    }
+
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const game = room.game;
@@ -137,6 +168,11 @@ module.exports = function gameHandlers(io, socket, roomManager) {
 
     if (game.started) {
       socket.emit('toast', 'A partida já foi iniciada.');
+      return;
+    }
+
+    if (timeLimit !== null && ![30, 60, 180, 0].includes(Number(timeLimit))) {
+      socket.emit('toast', 'Valor de tempo limite inválido.');
       return;
     }
 
@@ -162,6 +198,7 @@ module.exports = function gameHandlers(io, socket, roomManager) {
   });
 
   socket.on('turnTimeout', () => {
+    if (!actionLimiter.isAllowed(socket.id)) return;
     const room = roomManager.findRoomBySocket(socket.id);
     if (!room) return;
     const playerIndex = roomManager.findPlayerIndex(room, socket.id);

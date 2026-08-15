@@ -1,6 +1,6 @@
-# Truco Paulista 
+# Trucou !
 
-Truco Paulista multiplayer para sala de aula.
+Truco Paulista multiplayer.
 
 ## Funcionalidades
 
@@ -25,7 +25,7 @@ Abra http://localhost:3000
 
 ## Como jogar
 
-1. Um aluno cria a sala e escolhe 1v1 ou Duplas
+1. Um jogador cria a sala e escolhe 1v1 ou Duplas
 2. Recebe um código (ex: `K7M2`)
 3. Os outros entram com o código e o nome
 4. Quando todos entrarem, o jogo começa automaticamente

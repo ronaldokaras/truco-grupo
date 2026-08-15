@@ -1,7 +1,7 @@
 {
-  "name": "truco-na-escola",
+  "name": "Trucou",
   "version": "2.0.0",
-  "description": "Truco Paulista multiplayer para sala de aula",
+  "description": "Truco Paulista multiplayer - Trucou!",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

@@ -22,7 +22,14 @@ const app = express();
 const server = http.createServer(app);
 
 // Middleware de segurança para HTTP
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // desativa CSP para não bloquear scripts inline
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+  })
+);
 
 // Limite de requisições HTTP (para evitar abuso de rotas estáticas)
 const httpLimiter = rateLimit({

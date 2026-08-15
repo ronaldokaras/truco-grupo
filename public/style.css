@@ -1033,3 +1033,49 @@ body::before {
   .chat-messages { max-height: 160px; }
   .logs-toggle { width: 38px; height: 38px; font-size: 1.2rem; bottom: 15px; left: 15px; }
 }
+
+/* Indicador de conexão */
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.status-dot.online {
+  background: #69f0ae;
+  box-shadow: 0 0 6px #69f0ae;
+}
+.status-dot.offline {
+  background: #ef5350;
+  box-shadow: 0 0 6px #ef5350;
+}
+
+/* Botão de áudio */
+.audio-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid var(--color-accent);
+  color: #fff;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.audio-toggle:hover {
+  background: rgba(255,235,59,0.2);
+  transform: scale(1.1);
+}
+.audio-toggle.active {
+  background: rgba(255,235,59,0.3);
+  box-shadow: 0 0 15px rgba(255,235,59,0.5);
+}

@@ -1,11 +1,168 @@
 /**
  * Lógica do cliente (frontend) do Trucou!
  * Gerencia a interface, conexão Socket.IO e eventos recebidos do servidor.
- * Atualiza a tela conforme o estado do jogo e envia ações do jogador.
- * Todos os estilos são controlados via classes CSS (nenhum inline).
+ * Inclui sistema de áudio (música de fundo e efeitos sonoros).
  */
 
 const socket = io({ transports: ['websocket', 'polling'] });
+
+// ---------- Sistema de Áudio ----------
+const AudioManager = {
+  audioCtx: null,
+  audioEnabled: false,
+  musicTimeout: null,
+  musicStep: 0,
+  masterGain: null,
+  sfxGain: null,
+  activeNodes: [], // armazena { osc, gain } para parada imediata
+
+  ensureContext() {
+    if (!this.audioCtx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.audioCtx = new AudioCtx();
+        this.masterGain = this.audioCtx.createGain();
+        this.masterGain.gain.value = 0.2; // volume mestre (música + efeitos)
+        this.masterGain.connect(this.audioCtx.destination);
+
+        this.sfxGain = this.audioCtx.createGain();
+        this.sfxGain.gain.value = 0.5;    // volume apenas para efeitos
+        this.sfxGain.connect(this.masterGain);
+      }
+    }
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+  },
+
+  // Registra nós para parada imediata
+  trackNode(osc, gain) {
+    this.activeNodes.push({ osc, gain });
+    osc.onended = () => {
+      this.activeNodes = this.activeNodes.filter(n => n.osc !== osc);
+    };
+  },
+
+  // Para todos os nós ativos (usado ao silenciar)
+  stopAllNodes() {
+    this.activeNodes.forEach(({ osc, gain }) => {
+      try { osc.stop(); } catch (e) {}
+      try { gain.disconnect(); } catch (e) {}
+    });
+    this.activeNodes = [];
+  },
+
+  playTone(freq, duration, type = 'sine', volume = 0.3) {
+    if (!this.audioEnabled || !this.audioCtx || !this.sfxGain) return;
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+    gain.gain.setValueAtTime(volume, this.audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    this.trackNode(osc, gain);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + duration);
+  },
+
+  // Efeitos sonoros específicos
+  playCardSound() {
+    this.playTone(600, 0.15, 'triangle', 0.2);
+    setTimeout(() => this.playTone(800, 0.1, 'sine', 0.15), 50);
+  },
+  playTrucoSound() {
+    this.playTone(400, 0.3, 'sawtooth', 0.25);
+    setTimeout(() => this.playTone(600, 0.3, 'sawtooth', 0.25), 150);
+  },
+  playAcceptSound() {
+    this.playTone(800, 0.2, 'sine', 0.25);
+    setTimeout(() => this.playTone(1000, 0.2, 'sine', 0.25), 100);
+  },
+  playFleeSound() {
+    this.playTone(300, 0.3, 'square', 0.2);
+    setTimeout(() => this.playTone(200, 0.3, 'square', 0.2), 150);
+  },
+  playWinHandSound() {
+    this.playTone(500, 0.2, 'sine', 0.3);
+    setTimeout(() => this.playTone(700, 0.2, 'sine', 0.3), 150);
+    setTimeout(() => this.playTone(900, 0.3, 'sine', 0.35), 300);
+  },
+  playWinGameSound() {
+    this.playTone(400, 0.3, 'triangle', 0.35);
+    setTimeout(() => this.playTone(600, 0.3, 'triangle', 0.35), 200);
+    setTimeout(() => this.playTone(800, 0.3, 'triangle', 0.35), 400);
+    setTimeout(() => this.playTone(1000, 0.5, 'triangle', 0.4), 600);
+  },
+
+  // Música de fundo (loop de acordes)
+  startMusic() {
+    if (!this.audioEnabled || !this.audioCtx) return;
+    const chords = [
+      [220.00, 261.63, 329.63], // Am
+      [174.61, 220.00, 261.63], // F
+      [196.00, 246.94, 293.66], // C
+      [196.00, 246.94, 329.63]  // G
+    ];
+    const stepDuration = 2000;
+
+    const playChord = (freqs, duration) => {
+      if (!this.audioEnabled) return;
+      freqs.forEach(freq => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.1, this.audioCtx.currentTime + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        this.trackNode(osc, gain);
+        osc.start();
+        osc.stop(this.audioCtx.currentTime + duration);
+      });
+    };
+
+    const playNext = () => {
+      if (!this.audioEnabled) return;
+      const chord = chords[this.musicStep % chords.length];
+      playChord(chord, stepDuration);
+      this.musicStep++;
+      this.musicTimeout = setTimeout(playNext, stepDuration);
+    };
+
+    playNext();
+  },
+
+  stopMusic() {
+    if (this.musicTimeout) {
+      clearTimeout(this.musicTimeout);
+      this.musicTimeout = null;
+    }
+    // Para também os nós que estão tocando agora
+    this.stopAllNodes();
+  },
+
+  toggleAudio() {
+    this.audioEnabled = !this.audioEnabled;
+    if (this.audioEnabled) {
+      this.ensureContext();
+      this.startMusic();
+    } else {
+      this.stopMusic();
+      // Garante silêncio total imediato
+      if (this.masterGain) this.masterGain.gain.value = 0;
+    }
+    // Se reativar, restaura o volume do masterGain
+    if (this.audioEnabled && this.masterGain) {
+      this.masterGain.gain.value = 0.6;
+    }
+    return this.audioEnabled;
+  }
+};
+// ------------------------------------
 
 let myIndex = -1;
 let myToken = null;
@@ -39,8 +196,18 @@ const trucoText = document.getElementById('truco-text');
 // Timer de turno
 const turnTimerEl = document.createElement('div');
 turnTimerEl.id = 'turn-timer';
-turnTimerEl.className = 'turn-timer'; // Adicionado para estilização via CSS
+turnTimerEl.className = 'turn-timer';
 document.body.appendChild(turnTimerEl);
+
+// Controle de áudio
+const audioToggleBtn = document.getElementById('audio-toggle');
+if (audioToggleBtn) {
+  audioToggleBtn.addEventListener('click', () => {
+    const enabled = AudioManager.toggleAudio();
+    audioToggleBtn.textContent = enabled ? '🔊' : '🔇';
+    audioToggleBtn.classList.toggle('active', enabled);
+  });
+}
 
 // Mostrar/ocultar chat
 chatToggle.addEventListener('click', () => {
@@ -75,7 +242,6 @@ chatInput.addEventListener('keydown', (e) => {
 function addChatMessage(name, message, isSpectator) {
   const div = document.createElement('div');
   const prefix = isSpectator ? '<espectador>' : '<player>';
-  // Classe para colorir o prefixo
   const prefixClass = isSpectator ? 'chat-prefix-spectator' : 'chat-prefix-player';
   div.innerHTML = `<span class="${prefixClass}">${prefix}</span>${name}: ${message}`;
   chatMessages.appendChild(div);
@@ -300,7 +466,6 @@ socket.on('gameStarted', (data) => {
   toast('🎮 Partida iniciada!');
 });
 
-// Timer de turno vindo do servidor
 socket.on('turnTimer', (data) => {
   if (data.timeLimit) {
     startTurnTimer(data.timeLimit);
@@ -309,15 +474,8 @@ socket.on('turnTimer', (data) => {
   }
 });
 
-// Efeito Truco CORRIGIDO
 socket.on('trucoEffect', (data) => {
-  const levelNames = {
-    1: 'TRUCO',  // fallback
-    3: 'TRUCO',
-    6: 'SEIS',
-    9: 'NOVE',
-    12: 'DOZE'
-  };
+  const levelNames = { 1: 'TRUCO', 3: 'TRUCO', 6: 'SEIS', 9: 'NOVE', 12: 'DOZE' };
   const levelName = levelNames[data.level] || `Nível ${data.level}`;
   trucoText.innerHTML = `${levelName}!<small>${data.player}</small>`;
   trucoOverlay.style.display = 'flex';
@@ -328,9 +486,10 @@ socket.on('trucoEffect', (data) => {
   setTimeout(() => {
     trucoOverlay.style.display = 'none';
   }, 2500);
+  // Toca som de truco ao receber o efeito
+  AudioManager.playTrucoSound();
 });
 
-// Atualiza estado do jogo
 socket.on('gameState', (state) => {
   currentState = state;
   renderGame(state);
@@ -366,13 +525,11 @@ function suitSymbol(suit) {
 function isRedSuit(suit) {
   return suit === 'copas' || suit === 'ouros';
 }
-
 function getRelativePosClass(idx, myIdx, maxPlayers) {
   if (maxPlayers === 2) return idx === myIdx ? 'pos-bottom' : 'pos-top';
   const rel = (idx - myIdx + 4) % 4;
   return ['pos-bottom', 'pos-right', 'pos-top', 'pos-left'][rel];
 }
-
 function canPlay(state) {
   return state.started &&
     state.turn === state.yourIndex &&
@@ -381,7 +538,6 @@ function canPlay(state) {
     !state.gameOver;
 }
 
-// Renderizações (renderWaiting, renderGame, renderSpectator)
 function renderWaiting(state) {
   hideAllMenus();
   const wait = document.getElementById('waiting-screen');
@@ -391,7 +547,10 @@ function renderWaiting(state) {
   const list = document.getElementById('waiting-list');
   list.innerHTML = state.players.map((p, i) => {
     const ready = p.connected && p.name && !p.name.startsWith('Jogador ');
-    return `<li class="${ready ? 'ok' : 'wait'}">${ready ? '✅' : '⏳'} ${p.name}${p.connected ? '' : ' (offline)'}</li>`;
+    const dotClass = p.connected ? 'online' : 'offline';
+    return `<li class="${ready ? 'ok' : 'wait'}">
+      <span class="status-dot ${dotClass}"></span>${p.name}${p.connected ? '' : ' (offline)'}
+    </li>`;
   }).join('');
 }
 
@@ -437,8 +596,12 @@ function renderGame(state) {
       ? 'Individual'
       : `<span class="team-badge t${p.team}">Time ${p.team + 1}</span>`;
 
+    const connectionDot = p.connected
+      ? '<span class="status-dot online"></span>'
+      : '<span class="status-dot offline"></span>';
+
     div.innerHTML = `
-      <div class="player-name">${p.name}${badges}</div>
+      <div class="player-name">${connectionDot} ${p.name}${badges}</div>
       <div class="player-team">${teamLabel}${!p.connected ? ' 💤' : ''}</div>
       <div class="cards" id="hand-${idx}"></div>
     `;
@@ -451,7 +614,10 @@ function renderGame(state) {
         cardEl.className = `card ${isRedSuit(card.suit) ? 'red' : ''} yours${playable ? '' : ' disabled'}`;
         cardEl.innerHTML = `<div>${card.rank}</div><div>${suitSymbol(card.suit)}</div>`;
         if (playable) {
-          cardEl.onclick = () => socket.emit('playCard', { suit: card.suit, rank: card.rank });
+          cardEl.onclick = () => {
+            AudioManager.playCardSound();
+            socket.emit('playCard', { suit: card.suit, rank: card.rank });
+          };
         }
         handDiv.appendChild(cardEl);
       });
@@ -546,14 +712,14 @@ function renderGame(state) {
     if (ch.waitingOn === state.yourIndex) {
       let raiseBtn = '';
       if (ch.level < 12) {
-        raiseBtn = `<button class="btn" onclick="socket.emit('respondTruco','raise')">AUMENTAR ⬆️</button>`;
+        raiseBtn = `<button class="btn" onclick="AudioManager.playAcceptSound(); socket.emit('respondTruco','raise')">AUMENTAR ⬆️</button>`;
       }
       challengeArea.innerHTML = `
         <div class="challenge-box">
           <p class="challenge-text">💥 <strong>${state.players[ch.challenger]?.name}</strong> pediu <strong>${levelName}</strong>!</p>
-          <button class="btn" onclick="socket.emit('respondTruco','accept')">ACEITAR 👍</button>
+          <button class="btn" onclick="AudioManager.playAcceptSound(); socket.emit('respondTruco','accept')">ACEITAR 👍</button>
           ${raiseBtn}
-          <button class="btn btn-flee" onclick="socket.emit('respondTruco','flee')">FUGIR 🏃</button>
+          <button class="btn btn-flee" onclick="AudioManager.playFleeSound(); socket.emit('respondTruco','flee')">FUGIR 🏃</button>
         </div>
       `;
     } else {
@@ -565,7 +731,7 @@ function renderGame(state) {
   if (playable) {
     const nextLevel = { 1: 3, 3: 6, 6: 9, 9: 12 }[state.currentHandValue];
     if (nextLevel) {
-      actionDiv.innerHTML = `<button class="btn truco" onclick="socket.emit('truco')">🗣️ PEDIR TRUCO!</button>`;
+      actionDiv.innerHTML = `<button class="btn truco" onclick="AudioManager.playTrucoSound(); socket.emit('truco')">🗣️ PEDIR TRUCO!</button>`;
     } else {
       actionDiv.innerHTML = `<button class="btn truco" disabled title="Máximo atingido">Truco (máx.)</button>`;
     }
@@ -576,6 +742,7 @@ function renderGame(state) {
       ? state.players[state.handWinnerTeam]?.name
       : (state.teamNames?.[state.handWinnerTeam] || `Time ${state.handWinnerTeam + 1}`);
     toast(`🎉 ${winnerName} venceu a mão! (+${state.currentHandValue})`);
+    AudioManager.playWinHandSound();
     actionDiv.innerHTML = `<button class="btn next" onclick="socket.emit('nextHand')">Próxima Mão ➡️</button>`;
   }
 
@@ -584,6 +751,7 @@ function renderGame(state) {
       ? state.players[state.winnerTeam]?.name
       : (state.teamNames?.[state.winnerTeam] || `Time ${state.winnerTeam + 1}`);
     toast(`🌟 ${vencedor} VENCEU O JOGO!`);
+    AudioManager.playWinGameSound();
     actionDiv.innerHTML = `<button class="btn" onclick="socket.emit('restart')">🔄 Jogar Novamente</button>`;
   }
 }

@@ -1,3 +1,10 @@
+/**
+ * Lógica do cliente (frontend) do Trucou!
+ * Gerencia a interface, conexão Socket.IO e eventos recebidos do servidor.
+ * Atualiza a tela conforme o estado do jogo e envia ações do jogador.
+ * Todos os estilos são controlados via classes CSS (nenhum inline).
+ */
+
 const socket = io({ transports: ['websocket', 'polling'] });
 
 let myIndex = -1;
@@ -32,6 +39,7 @@ const trucoText = document.getElementById('truco-text');
 // Timer de turno
 const turnTimerEl = document.createElement('div');
 turnTimerEl.id = 'turn-timer';
+turnTimerEl.className = 'turn-timer'; // Adicionado para estilização via CSS
 document.body.appendChild(turnTimerEl);
 
 // Mostrar/ocultar chat
@@ -67,8 +75,9 @@ chatInput.addEventListener('keydown', (e) => {
 function addChatMessage(name, message, isSpectator) {
   const div = document.createElement('div');
   const prefix = isSpectator ? '<espectador>' : '<player>';
-  const color = isSpectator ? '#ef5350' : '#42a5f5';
-  div.innerHTML = `<span style="color:${color};">${prefix}</span>${name}: ${message}`;
+  // Classe para colorir o prefixo
+  const prefixClass = isSpectator ? 'chat-prefix-spectator' : 'chat-prefix-player';
+  div.innerHTML = `<span class="${prefixClass}">${prefix}</span>${name}: ${message}`;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -177,7 +186,7 @@ logsClose.addEventListener('click', () => {
 
 function renderLogs(logs) {
   if (!logs || logs.length === 0) {
-    logsContent.innerHTML = '<p style="color:#999;">Nenhuma ação registrada ainda.</p>';
+    logsContent.innerHTML = '<p class="logs-empty">Nenhuma ação registrada ainda.</p>';
     return;
   }
   logsContent.innerHTML = logs.map(log => `
@@ -475,8 +484,8 @@ function renderGame(state) {
 
   const scoreHtml = `
     <div class="score-board">
-      <div class="score-team team0 ${s0 > s1 ? 'winning' : ''}">${name0}<br><span style="font-size:1.4em">🏆 ${s0}</span></div>
-      <div class="score-team team1 ${s1 > s0 ? 'winning' : ''}">${name1}<br><span style="font-size:1.4em">🏆 ${s1}</span></div>
+      <div class="score-team team0 ${s0 > s1 ? 'winning' : ''}">${name0}<br><span class="score-value">🏆 ${s0}</span></div>
+      <div class="score-team team1 ${s1 > s0 ? 'winning' : ''}">${name1}<br><span class="score-value">🏆 ${s1}</span></div>
     </div>
   `;
 
@@ -494,16 +503,16 @@ function renderGame(state) {
   centerDiv.innerHTML = `
     <div class="vira-area">
       ${viraHtml}
-      <div style="text-align:left;">
-        <div style="font-size:0.8em; opacity:0.85; text-transform:uppercase;">Carta Vira</div>
-        <div style="font-size:1.05em; margin-top:2px;">Manilha:<br><strong class="manilha-highlight">${state.manilhaRank || '?'}</strong></div>
+      <div class="vira-info">
+        <div class="vira-label">Carta Vira</div>
+        <div class="manilha-text">Manilha:<br><strong class="manilha-highlight">${state.manilhaRank || '?'}</strong></div>
       </div>
     </div>
     ${partnerHtml}
     ${scoreHtml}
     ${historyHtml}
-    <div style="font-size:0.95rem; background:rgba(0,0,0,0.45); padding:5px 10px; border-radius:9px; display:inline-block; margin:0 auto;">
-      Pontos da rodada: <strong style="color:#ffeb3b;">${state.currentHandValue}</strong>
+    <div class="hand-value-badge">
+      Pontos da rodada: <strong class="hand-value-number">${state.currentHandValue}</strong>
     </div>
     <div class="turn-info ${isMyTurn && !state.challenge && !state.handWinnerTeam && !state.gameOver ? 'my-turn' : ''}">
       ${isMyTurn && !state.challenge && !state.handWinnerTeam && !state.gameOver
@@ -541,14 +550,14 @@ function renderGame(state) {
       }
       challengeArea.innerHTML = `
         <div class="challenge-box">
-          <p style="margin-bottom:8px; font-size:1.05em;">💥 <strong>${state.players[ch.challenger]?.name}</strong> pediu <strong>${levelName}</strong>!</p>
+          <p class="challenge-text">💥 <strong>${state.players[ch.challenger]?.name}</strong> pediu <strong>${levelName}</strong>!</p>
           <button class="btn" onclick="socket.emit('respondTruco','accept')">ACEITAR 👍</button>
           ${raiseBtn}
-          <button class="btn" style="background:#fff;color:#c62828;" onclick="socket.emit('respondTruco','flee')">FUGIR 🏃</button>
+          <button class="btn btn-flee" onclick="socket.emit('respondTruco','flee')">FUGIR 🏃</button>
         </div>
       `;
     } else {
-      challengeArea.innerHTML = `<p style="color:#ffeb3b; font-weight:700;">⏳ Aguardando <strong>${state.players[ch.waitingOn]?.name}</strong>...</p>`;
+      challengeArea.innerHTML = `<p class="challenge-waiting">⏳ Aguardando <strong>${state.players[ch.waitingOn]?.name}</strong>...</p>`;
     }
   }
 
@@ -613,7 +622,7 @@ function renderSpectator(state) {
   let challengeHtml = '';
   if (state.challenge) {
     const levelName = { 3: 'TRUCO', 6: 'SEIS', 9: 'NOVE', 12: 'DOZE' }[state.challenge.level] || state.challenge.level;
-    challengeHtml = `<p style="color:#ffeb3b; font-weight:700;">🗣️ Truco em andamento: ${levelName}</p>`;
+    challengeHtml = `<p class="challenge-in-progress">🗣️ Truco em andamento: ${levelName}</p>`;
   }
 
   const s0 = state.scores[0];
@@ -622,21 +631,21 @@ function renderSpectator(state) {
   const name1 = state.maxPlayers === 2 ? (state.players[1]?.name || 'J2') : (state.teamNames?.[1] || 'Time 2');
 
   table.innerHTML = `
-    <div class="center-area" style="grid-column:1/4; grid-row:1/4;">
-      <h2 style="color:#ffeb3b; margin-bottom:8px;">👀 Modo Espectador</h2>
+    <div class="center-area spectator-center" style="grid-column:1/4; grid-row:1/4;">
+      <h2 class="spectator-title">👀 Modo Espectador</h2>
       <div class="vira-area">
         ${viraHtml}
-        <div>Manilha: <strong class="manilha-highlight">${state.manilhaRank || '?'}</strong></div>
+        <div class="vira-info">Manilha: <strong class="manilha-highlight">${state.manilhaRank || '?'}</strong></div>
       </div>
-      <div class="score-board" style="margin:8px 0;">
+      <div class="score-board score-board-margin">
         <div class="score-team team0">${name0}<br>🏆 ${s0}</div>
         <div class="score-team team1">${name1}<br>🏆 ${s1}</div>
       </div>
       ${historyHtml}
-      <div class="turn-info">Vez de: <strong>${state.turnPlayerName || '?'}</strong> · Rodada vale <strong style="color:#ffeb3b;">${state.currentHandValue}</strong></div>
+      <div class="turn-info">Vez de: <strong>${state.turnPlayerName || '?'}</strong> · Rodada vale <strong class="hand-value-number">${state.currentHandValue}</strong></div>
       ${challengeHtml}
-      <div class="board-cards">${boardHtml || '<span style="opacity:0.6;">Aguardando cartas...</span>'}</div>
-      <p style="margin-top:8px; opacity:0.8; font-size:0.9rem;">Assista e aprenda as estratégias!</p>
+      <div class="board-cards">${boardHtml || '<span class="text-muted">Aguardando cartas...</span>'}</div>
+      <p class="spectator-hint">Assista e aprenda as estratégias!</p>
     </div>
   `;
 }

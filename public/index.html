@@ -1,24 +1,32 @@
+<!--
+  Página principal do Trucou!
+  Estrutura HTML pura, sem estilos inline.
+  Todo o CSS está no arquivo /style.css.
+  Contém as telas de menu, mesa de jogo, chat, logs e overlay de truco.
+  As imagens estão na pasta public/assets/.
+-->
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trucou!</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div id="toasts"></div>
+  <div id="toasts" class="toasts"></div>
 
-  <div id="logo-container">
-    <img src="/src/logo.png" alt="Trucou!" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-    <h1 style="display:none; color:#ffeb3b; font-size:2rem;">TRUCOU!</h1>
+  <div id="logo-container" class="logo-container">
+    <img src="/assets/logo.png" alt="Trucou!" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+    <h1 id="logo-fallback" class="logo-fallback">TRUCOU!</h1>
   </div>
 
-  <div id="room-badge" class="room-badge" style="display:none;">Sala: <span id="room-code-label"></span></div>
+  <div id="room-badge" class="room-badge">Sala: <span id="room-code-label"></span></div>
 
   <!-- OVERLAY DE TRUCO -->
-  <div id="truco-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9998; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); animation:fadeIn 0.3s;">
-    <div id="truco-text" style="font-size:8rem; font-weight:900; color:#ffeb3b; text-shadow:0 0 40px #ff9800, 0 0 80px #ff5722; transform:scale(0); animation:pop 0.5s forwards; font-family:'Nunito',sans-serif;"></div>
+  <div id="truco-overlay" class="truco-overlay">
+    <div id="truco-text" class="truco-text"></div>
   </div>
 
   <!-- MENU PRINCIPAL -->
@@ -32,9 +40,9 @@
   </div>
 
   <!-- CRIAR -->
-  <div id="create-menu" class="menu" style="display:none;">
+  <div id="create-menu" class="menu">
     <h2>Criar Sala</h2>
-    <p style="margin-bottom:12px; opacity:0.9;">Escolha o modo:</p>
+    <p class="menu-description">Escolha o modo:</p>
     <div class="menu-buttons">
       <button onclick="createRoom('1v1')">1 vs 1</button>
       <button onclick="createRoom('duplas')">Duplas (2v2)</button>
@@ -43,7 +51,7 @@
   </div>
 
   <!-- ENTRAR -->
-  <div id="join-menu" class="menu" style="display:none;">
+  <div id="join-menu" class="menu">
     <h2>Entrar na Sala</h2>
     <input type="text" id="join-code" class="code-input" placeholder="CÓDIGO" maxlength="6" autocomplete="off" />
     <div class="menu-buttons">
@@ -55,64 +63,64 @@
   <!-- AGUARDANDO -->
   <div id="waiting-screen" class="menu">
     <h2>Aguardando jogadores</h2>
-    <p>Código da sala: <strong id="wait-code" style="color:#ffeb3b; font-size:1.4rem; letter-spacing:2px;"></strong></p>
-    <p style="margin:8px 0; opacity:0.85; font-size:0.9rem;">Compartilhe o código com os colegas</p>
+    <p>Código da sala: <strong id="wait-code" class="wait-code"></strong></p>
+    <p class="waiting-hint">Compartilhe o código com os colegas</p>
     <ul class="waiting-box" id="waiting-list"></ul>
     
     <!-- Controles do host -->
-    <div id="host-controls" style="display:none; margin-top:15px; padding:12px; background:rgba(0,0,0,0.3); border-radius:12px;">
-      <p style="font-weight:bold; margin-bottom:8px;">⚙️ Controles do criador</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
-        <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+    <div id="host-controls" class="host-controls">
+      <p class="host-controls-title">⚙️ Controles do criador</p>
+      <div class="time-limit-options">
+        <label class="radio-label">
           <input type="radio" name="timeLimit" value="30"> 30s
         </label>
-        <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+        <label class="radio-label">
           <input type="radio" name="timeLimit" value="60" checked> 1min
         </label>
-        <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+        <label class="radio-label">
           <input type="radio" name="timeLimit" value="180"> 3min
         </label>
-        <label style="display:flex; align-items:center; gap:4px; font-size:0.9rem;">
+        <label class="radio-label">
           <input type="radio" name="timeLimit" value="0"> Sem limite
         </label>
       </div>
-      <button id="start-game-btn" class="btn" style="margin-top:10px; background:#4caf50; box-shadow:0 5px 0 #2e7d32;">▶️ Iniciar Partida</button>
+      <button id="start-game-btn" class="btn start-btn">▶️ Iniciar Partida</button>
     </div>
 
-    <button class="btn ghost" onclick="leaveRoom()" style="margin-top:14px;">Sair da sala</button>
+    <button class="btn ghost leave-waiting-btn" onclick="leaveRoom()">Sair da sala</button>
   </div>
 
   <!-- MESA -->
   <div class="table" id="game-table"></div>
 
   <!-- BOTÃO SAIR DA SALA (flutuante) -->
-  <button id="leave-room-btn" class="btn ghost" style="display:none; position:fixed; bottom:20px; left:20px; z-index:100; background:rgba(200,0,0,0.15); border-color:#ff6b6b; color:#ff6b6b; padding:8px 16px; font-size:0.9rem; border-radius:30px; backdrop-filter:blur(4px);" onclick="leaveRoom()">🚪 Sair da Sala</button>
+  <button id="leave-room-btn" class="btn ghost leave-room-btn" onclick="leaveRoom()">🚪 Sair da Sala</button>
 
   <!-- CHAT FLUTUANTE -->
-  <div id="chat-container" style="display:none; position:fixed; bottom:20px; right:20px; width:280px; max-height:350px; background:rgba(0,0,0,0.85); border-radius:12px; border:1px solid #444; box-shadow:0 8px 20px rgba(0,0,0,0.6); display:flex; flex-direction:column; z-index:1000; backdrop-filter:blur(6px);">
-    <div style="padding:8px 12px; background:#1a1a1a; border-radius:12px 12px 0 0; font-weight:bold; color:#ffeb3b; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+  <div id="chat-container" class="chat-container">
+    <div class="chat-header">
       <span>Chat</span>
-      <span id="chat-toggle" style="cursor:pointer; font-size:1.2rem; user-select:none;">−</span>
+      <span id="chat-toggle" class="chat-toggle">−</span>
     </div>
-    <div id="chat-messages" style="flex:1; padding:8px; overflow-y:auto; max-height:220px; font-size:0.9rem; line-height:1.4; color:#eee; display:flex; flex-direction:column; gap:2px; min-height:100px;">
+    <div id="chat-messages" class="chat-messages">
       <!-- Mensagens aparecerão aqui -->
     </div>
-    <div style="display:flex; padding:6px; border-top:1px solid #333; gap:6px;">
-      <input type="text" id="chat-input" placeholder="Digite..." style="flex:1; padding:6px 10px; border-radius:20px; border:none; background:#2a2a2a; color:#fff; font-size:0.9rem; outline:none;" maxlength="80">
-      <button id="chat-send" style="background:#ffeb3b; border:none; border-radius:50%; width:32px; height:32px; font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#222;">➤</button>
+    <div class="chat-input-area">
+      <input type="text" id="chat-input" class="chat-input" placeholder="Digite..." maxlength="80">
+      <button id="chat-send" class="chat-send">➤</button>
     </div>
   </div>
 
   <!-- BOTÃO LOGS -->
-<button id="logs-toggle" style="display:none; position:fixed; bottom:63px; left:20px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:50%; width:44px; height:44px; font-size:1.4rem; cursor:pointer; z-index:900; box-shadow:0 4px 12px rgba(0,0,0,0.4);">📜</button>
+  <button id="logs-toggle" class="logs-toggle">📜</button>
 
   <!-- PAINEL DE LOGS -->
-  <div id="logs-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:90%; max-width:500px; max-height:70vh; background:rgba(20,20,20,0.95); border-radius:16px; padding:16px; z-index:9999; border:1px solid #555; box-shadow:0 8px 30px rgba(0,0,0,0.8); overflow-y:auto;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3 style="color:#ffeb3b; margin:0;">📜 Histórico da Partida</h3>
-      <button id="logs-close" style="background:transparent; border:none; color:#fff; font-size:1.6rem; cursor:pointer;">&times;</button>
+  <div id="logs-panel" class="logs-panel">
+    <div class="logs-header">
+      <h3>📜 Histórico da Partida</h3>
+      <button id="logs-close" class="logs-close">&times;</button>
     </div>
-    <div id="logs-content" style="color:#ddd; font-size:0.9rem; line-height:1.5; max-height:55vh; overflow-y:auto;"></div>
+    <div id="logs-content" class="logs-content"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

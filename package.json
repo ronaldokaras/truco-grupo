@@ -2,9 +2,9 @@
   "name": "Trucou",
   "version": "2.0.0",
   "description": "Truco Paulista multiplayer - Trucou!",
-  "main": "server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node src/server.js"
   },
   "engines": {
     "node": ">=18"

@@ -1,38 +1,99 @@
+/**
+ * Estilos da interface do Trucou!
+ * Define layout, cores, animações e responsividade do jogo.
+ * Utiliza variáveis CSS para facilitar manutenção e personalização.
+ * Caminho dos assets: /assets/ (imagens, fontes, etc.)
+ */
+
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap');
+
+/* ============ VARIÁVEIS CSS ============ */
+:root {
+  --bg-overlay: rgba(0,0,0,0.6);
+  --bg-light: rgba(0,0,0,0.35);
+  --bg-dark: rgba(0,0,0,0.8);
+  --bg-card: #fffde7;
+  --text-primary: #f5f5f5;
+  --text-dark: #222;
+  --text-muted: #aaa;
+  --color-accent: #ffeb3b;
+  --color-orange: #ff9800;
+  --color-green: #66bb6a;
+  --color-red: #ef5350;
+  --color-blue: #42a5f5;
+  --color-cyan: #4fc3f7;
+  --shadow-sm: 0 3px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 6px 20px rgba(0,0,0,0.4);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --font-main: 'Nunito', system-ui, sans-serif;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Nunito', system-ui, sans-serif;
-  background-image: url('/src/mesa.jpg'); /* imagem de fundo */
+  font-family: var(--font-main);
+  background-image: url('/assets/mesa.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  color: #f5f5f5;
+  color: var(--text-primary);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 10px;
   overflow-x: hidden;
-  backdrop-filter: brightness(0.8); /* escurece um pouco para melhor legibilidade */
+  position: relative;
 }
 
-/* Logo sem fundo */
+/* Esconder menus secundários por padrão */
+#create-menu,
+#join-menu {
+  display: none;
+}
+
+/* Overlay para escurecer o fundo e melhorar legibilidade */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ============ LOGO ============ */
 #logo-container {
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 6px 0 4px;
 }
+
 #logo-container img {
   max-width: 280px;
   height: auto;
 }
 
-/* Badge da sala */
+.logo-fallback {
+  display: none; /* será mostrado via JS se a imagem falhar */
+  color: var(--color-accent);
+  font-size: 2rem;
+  font-weight: 800;
+  text-shadow: 0 0 20px var(--color-orange);
+}
+
+/* ============ BADGE DA SALA ============ */
 .room-badge {
-  background: rgba(0,0,0,0.6);
+  display: none; /* oculto por padrão, mostrado via JS */
+  background: var(--bg-dark);
   padding: 4px 14px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -40,10 +101,13 @@ body {
   letter-spacing: 1px;
   margin-bottom: 6px;
   border: 1px solid rgba(255,255,255,0.15);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
-.room-badge span { color: #ffeb3b; }
 
-/* TOASTS */
+.room-badge span { color: var(--color-accent); }
+
+/* ============ TOASTS ============ */
 #toasts {
   position: fixed;
   top: 12px;
@@ -58,14 +122,14 @@ body {
 }
 
 .toast {
-  background: rgba(0,0,0,0.85);
+  background: var(--bg-dark);
   color: #fff;
   padding: 12px 18px;
   border-radius: 14px;
   font-weight: 700;
   font-size: 0.95rem;
   text-align: center;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-md);
   border: 1px solid rgba(255,255,255,0.12);
   animation: toastIn 0.25s ease, toastOut 0.3s ease 2.7s forwards;
 }
@@ -74,19 +138,21 @@ body {
   from { opacity: 0; transform: translateY(-12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
 @keyframes toastOut {
   to { opacity: 0; transform: translateY(-8px); }
 }
 
-/* MENUS */
+/* ============ MENUS ============ */
 .menu {
-  background: rgba(0,0,0,0.6);
+  background: var(--bg-overlay);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   padding: 26px 28px;
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   text-align: center;
   margin-top: 28px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-lg);
   border: 2px solid rgba(255,255,255,0.18);
   max-width: 380px;
   width: 100%;
@@ -94,27 +160,32 @@ body {
 
 .menu h2 {
   margin-bottom: 16px;
-  color: #ffeb3b;
+  color: var(--color-accent);
   font-size: 1.4rem;
+}
+
+.menu-description {
+  margin-bottom: 12px;
+  opacity: 0.9;
 }
 
 .menu input {
   width: 100%;
   padding: 12px 14px;
   font-size: 1.1rem;
-  border-radius: 12px;
-  border: 3px solid #66bb6a;
+  border-radius: var(--radius-md);
+  border: 3px solid var(--color-green);
   outline: none;
   font-family: inherit;
   text-align: center;
-  background: #fffde7;
-  color: #222;
+  background: var(--bg-card);
+  color: var(--text-dark);
   margin-bottom: 12px;
   font-weight: 600;
 }
 
 .menu input:focus {
-  border-color: #ffeb3b;
+  border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(255,235,59,0.25);
 }
 
@@ -131,7 +202,9 @@ body {
   gap: 10px;
 }
 
-.menu button, .btn {
+/* ============ BOTÕES ============ */
+.menu button,
+.btn {
   padding: 12px 20px;
   font-size: 1rem;
   border: none;
@@ -147,7 +220,8 @@ body {
   letter-spacing: 0.3px;
 }
 
-.menu button:active, .btn:active:not(:disabled) {
+.menu button:active,
+.btn:active:not(:disabled) {
   transform: translateY(5px);
   box-shadow: 0 0 0 #ef6c00;
 }
@@ -160,18 +234,20 @@ body {
 }
 
 .btn.truco {
-  background: #ef5350;
+  background: var(--color-red);
   color: #fff;
   font-size: 1.1rem;
   box-shadow: 0 5px 0 #c62828;
 }
+
 .btn.truco:active:not(:disabled) { box-shadow: 0 0 0 #c62828; }
 
 .btn.next {
-  background: #66bb6a;
+  background: var(--color-green);
   color: #fff;
   box-shadow: 0 5px 0 #2e7d32;
 }
+
 .btn.next:active:not(:disabled) { box-shadow: 0 0 0 #2e7d32; }
 
 .btn.ghost {
@@ -181,27 +257,111 @@ body {
   border: 2px solid rgba(255,255,255,0.35);
   margin-top: 8px;
 }
+
 .btn.ghost:active { transform: none; background: rgba(255,255,255,0.1); }
 
-/* WAITING */
+.btn-flee {
+  background: #fff;
+  color: #c62828;
+}
+
+/* Botão de iniciar partida */
+.start-btn {
+  margin-top: 10px;
+  background: var(--color-green);
+  box-shadow: 0 5px 0 #2e7d32;
+}
+
+/* Botão sair da sala flutuante */
+.leave-room-btn {
+  display: none; /* mostrado via JS */
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 100;
+  background: rgba(200,0,0,0.15);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  border-radius: 30px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.leave-room-btn:hover {
+  background: rgba(200,0,0,0.3) !important;
+  border-color: #ff4444 !important;
+  color: #ff4444 !important;
+  transform: scale(1.05);
+}
+
+/* Botão sair da sala (dentro do waiting) */
+.leave-waiting-btn {
+  margin-top: 14px;
+}
+
+/* ============ WAITING ============ */
+.wait-code {
+  color: var(--color-accent);
+  font-size: 1.4rem;
+  letter-spacing: 2px;
+}
+
+.waiting-hint {
+  margin: 8px 0;
+  opacity: 0.85;
+  font-size: 0.9rem;
+}
+
 .waiting-box {
-  background: rgba(0,0,0,0.35);
+  background: var(--bg-light);
   border-radius: 16px;
   padding: 16px;
   margin-top: 12px;
   text-align: left;
 }
+
 .waiting-box li {
   list-style: none;
   padding: 6px 0;
   font-weight: 700;
 }
+
 .waiting-box .ok { color: #69f0ae; }
 .waiting-box .wait { color: #ffcc80; }
 
-/* MESA */
+/* Controles do host */
+.host-controls {
+  display: none; /* mostrado via JS */
+  margin-top: 15px;
+  padding: 12px;
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--radius-md);
+}
+
+.host-controls-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.time-limit-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+/* ============ MESA ============ */
 .table {
-  display: grid;
+  display: none; /* mostrado via JS */
   grid-template-columns: 130px 1fr 130px;
   grid-template-rows: auto 1fr auto;
   gap: 10px;
@@ -209,6 +369,13 @@ body {
   max-width: 980px;
   margin-top: 4px;
   min-height: 500px;
+}
+
+#waiting-screen,
+#game-table {
+  display: none;
+  width: 100%;
+  max-width: 980px;
 }
 
 .player-area {
@@ -228,7 +395,7 @@ body {
   }
   50% {
     box-shadow: 0 0 22px rgba(255,235,59,0.9);
-    border-color: #ffeb3b;
+    border-color: var(--color-accent);
     transform: scale(1.02);
   }
 }
@@ -238,10 +405,10 @@ body {
   background: rgba(255,235,59,0.12);
 }
 
-.player-area.team0 { border-color: #42a5f5; }
-.player-area.team1 { border-color: #ef5350; }
+.player-area.team0 { border-color: var(--color-blue); }
+.player-area.team1 { border-color: var(--color-red); }
 .player-area.me { background: rgba(105,240,174,0.1); }
-.player-area.partner { box-shadow: inset 0 0 0 2px #4fc3f7; }
+.player-area.partner { box-shadow: inset 0 0 0 2px var(--color-cyan); }
 
 .player-name {
   font-size: 1.05rem;
@@ -264,16 +431,17 @@ body {
 .team-badge {
   display: inline-block;
   padding: 1px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.7rem;
   font-weight: 800;
 }
+
 .team-badge.t0 { background: #1976d2; color: #fff; }
 .team-badge.t1 { background: #c62828; color: #fff; }
 
 .turn-badge {
   display: inline-block;
-  background: #ffeb3b;
+  background: var(--color-accent);
   color: #111;
   font-size: 0.68rem;
   padding: 2px 6px;
@@ -281,6 +449,7 @@ body {
   font-weight: 800;
 }
 
+/* Cartas */
 .cards {
   display: flex;
   justify-content: center;
@@ -299,10 +468,11 @@ body {
   justify-content: center;
   font-size: 1.2rem;
   font-weight: 800;
-  background: #fffde7;
+  background: var(--bg-card);
   color: #212121;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
+  -webkit-user-select: none;
   user-select: none;
   box-shadow: 2px 3px 8px rgba(0,0,0,0.35);
   line-height: 1.15;
@@ -325,7 +495,7 @@ body {
 .card.yours:hover {
   transform: translateY(-12px) scale(1.08);
   box-shadow: 0 10px 18px rgba(0,0,0,0.5);
-  border-color: #66bb6a;
+  border-color: var(--color-green);
   z-index: 5;
 }
 
@@ -339,17 +509,18 @@ body {
   width: 60px;
   height: 88px;
   font-size: 1.35rem;
-  border: 3.5px solid #ffeb3b;
+  border: 3.5px solid var(--color-accent);
   box-shadow: 0 0 14px rgba(255,235,59,0.7);
   cursor: default;
 }
 
+/* Área central */
 .center-area {
   grid-column: 2;
   grid-row: 2;
   background: rgba(0,0,0,0.6);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 20.1l2.83 2.83 1.41-1.41L1.41 18.7H0v1.4zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM20.1 40l2.83-2.83 1.41 1.41L21.49 40h-1.39zM30.3 0l-2.83 2.83 1.41 1.41L31.71 0H30.3zM11.8 0l2.83 2.83L13.22 4.24 9.39 0h2.42z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 12px 10px;
   text-align: center;
   display: flex;
@@ -359,6 +530,7 @@ body {
   box-shadow: inset 0 0 24px rgba(0,0,0,0.4);
 }
 
+/* Cartas na mesa */
 .board-cards {
   display: flex;
   justify-content: center;
@@ -369,18 +541,9 @@ body {
 }
 
 @keyframes flyCard {
-  0% {
-    transform: scale(0.8) rotate(-5deg);
-    opacity: 0.5;
-  }
-  60% {
-    transform: scale(1.2) rotate(3deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
+  0% { transform: scale(0.8) rotate(-5deg); opacity: 0.5; }
+  60% { transform: scale(1.2) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
 .played-card {
@@ -399,6 +562,7 @@ body {
   font-size: 0.72rem;
 }
 
+/* Desafio (truco) */
 .challenge-box {
   background: rgba(198,40,40,0.88);
   padding: 12px;
@@ -408,6 +572,22 @@ body {
   box-shadow: 0 6px 16px rgba(0,0,0,0.35);
 }
 
+.challenge-text {
+  margin-bottom: 8px;
+  font-size: 1.05em;
+}
+
+.challenge-waiting {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.challenge-in-progress {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+/* Placar */
 .score-board {
   display: flex;
   justify-content: center;
@@ -417,32 +597,39 @@ body {
 
 .score-team {
   padding: 7px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-weight: 800;
   font-size: 1rem;
   min-width: 110px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .score-team.team0 {
   background: rgba(33,150,243,0.8);
   border: 2.5px solid #64b5f6;
 }
+
 .score-team.team1 {
   background: rgba(239,83,80,0.8);
   border: 2.5px solid #ef9a9a;
 }
+
 .score-team.winning {
   box-shadow: 0 0 16px rgba(255,235,59,0.75);
-  border-color: #ffeb3b;
+  border-color: var(--color-accent);
 }
 
+.score-value {
+  font-size: 1.4em;
+}
+
+/* Informações da rodada */
 .turn-info {
   font-size: 1.1rem;
   padding: 8px 12px;
   background: rgba(255,235,59,0.15);
   border-radius: 11px;
-  border: 1.5px dashed #ffeb3b;
+  border: 1.5px dashed var(--color-accent);
 }
 
 .turn-info.my-turn {
@@ -458,6 +645,7 @@ body {
   font-weight: 700;
 }
 
+/* Vira */
 .vira-area {
   display: flex;
   align-items: center;
@@ -465,8 +653,23 @@ body {
   gap: 12px;
 }
 
+.vira-info {
+  text-align: left;
+}
+
+.vira-label {
+  font-size: 0.8em;
+  opacity: 0.85;
+  text-transform: uppercase;
+}
+
+.manilha-text {
+  font-size: 1.05em;
+  margin-top: 2px;
+}
+
 .manilha-highlight {
-  background: #ff9800;
+  background: var(--color-orange);
   color: #fff;
   padding: 2px 7px;
   border-radius: 6px;
@@ -474,6 +677,18 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.35);
 }
 
+.hand-value-badge {
+  font-size: 0.95rem;
+  background: rgba(0,0,0,0.45);
+  padding: 5px 10px;
+  border-radius: 9px;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.hand-value-number { color: var(--color-accent); }
+
+/* Histórico de rodadas */
 .round-history {
   display: flex;
   justify-content: center;
@@ -482,63 +697,232 @@ body {
   font-size: 0.78rem;
   font-weight: 700;
 }
+
 .round-chip {
   background: rgba(0,0,0,0.4);
   padding: 3px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
-.round-chip.win0 { border-left: 3px solid #42a5f5; }
-.round-chip.win1 { border-left: 3px solid #ef5350; }
+
+.round-chip.win0 { border-left: 3px solid var(--color-blue); }
+.round-chip.win1 { border-left: 3px solid var(--color-red); }
 .round-chip.tie  { border-left: 3px solid #bbb; }
 
+/* Posições dos jogadores */
 .pos-bottom { grid-column: 2; grid-row: 3; }
 .pos-top    { grid-column: 2; grid-row: 1; }
 .pos-left   { grid-column: 1; grid-row: 2; }
 .pos-right  { grid-column: 3; grid-row: 2; }
 
-#waiting-screen, #game-table { display: none; width: 100%; max-width: 980px; }
-
-/* CHAT */
+/* ============ CHAT ============ */
 #chat-container {
-  display: none;
-}
-#chat-messages::-webkit-scrollbar {
-  width: 5px;
-}
-#chat-messages::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 10px;
-}
-#chat-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-#chat-input:focus {
-  border: 1px solid #ffeb3b;
+  display: none; /* mostrado via JS */
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 280px;
+  max-height: 350px;
+  background: rgba(0,0,0,0.85);
+  border-radius: var(--radius-md);
+  border: 1px solid #444;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+  flex-direction: column;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
-/* EFEITO TRUCO */
-@keyframes pop {
-  0% { transform: scale(0) rotate(-15deg); opacity: 0.5; }
-  70% { transform: scale(1.8) rotate(5deg); opacity: 1; }
-  100% { transform: scale(1.4) rotate(0deg); opacity: 1; }
+.chat-header {
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  font-weight: bold;
+  color: var(--color-accent);
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-@keyframes fadeIn {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+
+.chat-toggle {
+  cursor: pointer;
+  font-size: 1.2rem;
+  -webkit-user-select: none;
+  user-select: none;
 }
+
+.chat-messages {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 220px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 100px;
+}
+
+.chat-input-area {
+  display: flex;
+  padding: 6px;
+  border-top: 1px solid #333;
+  gap: 6px;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: none;
+  background: #2a2a2a;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.chat-input:focus {
+  border: 1px solid var(--color-accent);
+}
+
+.chat-send {
+  background: var(--color-accent);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #222;
+}
+
+/* Prefixos de chat */
+.chat-prefix-player { color: var(--color-blue); }
+.chat-prefix-spectator { color: var(--color-red); }
+
+/* ============ LOGS ============ */
+.logs-toggle {
+  display: none; /* mostrado via JS */
+  position: fixed;
+  bottom: 63px;
+  left: 20px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 1.4rem;
+  cursor: pointer;
+  z-index: 900;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.logs-panel {
+  display: none; /* mostrado via JS */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  width: 90%;
+  max-width: 500px;
+  max-height: 70vh;
+  background: rgba(20,20,20,0.95);
+  border-radius: 16px;
+  padding: 16px;
+  z-index: 9999;
+  border: 1px solid #555;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+  overflow-y: auto;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.logs-header h3 {
+  color: var(--color-accent);
+  margin: 0;
+}
+
+.logs-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+
+.logs-content {
+  color: #ddd;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-height: 55vh;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+}
+
+.log-entry {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.log-time {
+  color: #999;
+  margin-right: 8px;
+}
+
+.log-player {
+  color: var(--color-accent);
+  font-weight: bold;
+}
+
+.log-action {
+  color: #81d4fa;
+}
+
+.log-details {
+  color: #aaa;
+  font-style: italic;
+}
+
+.logs-empty { color: #999; }
+
+/* ============ EFEITO TRUCO ============ */
 #truco-overlay {
+  display: none; /* mostrado via JS */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  z-index: 9998;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+  animation: fadeIn 0.3s;
 }
+
 #truco-text {
   font-size: 8rem;
   font-weight: 900;
-  color: #ffeb3b;
-  text-shadow: 0 0 40px #ff9800, 0 0 80px #ff5722;
+  color: var(--color-accent);
+  text-shadow: 0 0 40px var(--color-orange), 0 0 80px #ff5722;
   transform: scale(0);
   animation: pop 0.5s forwards;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-main);
   text-align: center;
 }
+
 #truco-text small {
   font-size: 3rem;
   display: block;
@@ -546,39 +930,19 @@ body {
   text-shadow: 0 0 20px #ff5722;
 }
 
-/* LOGS */
-#logs-panel::-webkit-scrollbar {
-  width: 6px;
-}
-#logs-panel::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 10px;
-}
-#logs-content {
-  font-family: 'Courier New', monospace;
-}
-.log-entry {
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.log-time {
-  color: #999;
-  margin-right: 8px;
-}
-.log-player {
-  color: #ffeb3b;
-  font-weight: bold;
-}
-.log-action {
-  color: #81d4fa;
-}
-.log-details {
-  color: #aaa;
-  font-style: italic;
+@keyframes pop {
+  0% { transform: scale(0) rotate(-15deg); opacity: 0.5; }
+  70% { transform: scale(1.8) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1.4) rotate(0deg); opacity: 1; }
 }
 
-/* TIMER DE TURNO */
-#turn-timer {
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ============ TIMER DE TURNO ============ */
+.turn-timer {
   position: fixed;
   top: 70px;
   right: 20px;
@@ -587,34 +951,49 @@ body {
   border-radius: 30px;
   font-size: 1.6rem;
   font-weight: 900;
-  color: #ffeb3b;
-  border: 3px solid #ffeb3b;
+  color: var(--color-accent);
+  border: 3px solid var(--color-accent);
   z-index: 100;
-  display: none;
+  display: none; /* mostrado via JS */
   box-shadow: 0 0 20px rgba(255,235,59,0.3);
   min-width: 80px;
   text-align: center;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-main);
 }
-#turn-timer.warning {
+
+.turn-timer.warning {
   color: #ff5722;
   border-color: #ff5722;
   animation: pulse-timer 0.5s infinite alternate;
 }
+
 @keyframes pulse-timer {
   0% { box-shadow: 0 0 10px rgba(255,87,34,0.5); }
   100% { box-shadow: 0 0 30px rgba(255,87,34,0.9); }
 }
 
-/* BOTÃO SAIR */
-#leave-room-btn:hover {
-  background: rgba(200,0,0,0.3) !important;
-  border-color: #ff4444 !important;
-  color: #ff4444 !important;
-  transform: scale(1.05);
+/* ============ ESPECTADOR ============ */
+.spectator-center {
+  grid-column: 1 / 4;
+  grid-row: 1 / 4;
 }
 
-/* RESPONSIVIDADE */
+.spectator-title {
+  color: var(--color-accent);
+  margin-bottom: 8px;
+}
+
+.score-board-margin { margin: 8px 0; }
+
+.text-muted { opacity: 0.6; }
+
+.spectator-hint {
+  margin-top: 8px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+/* ============ RESPONSIVIDADE ============ */
 @media (max-width: 768px) {
   .table {
     grid-template-columns: 78px 1fr 78px;
@@ -629,13 +1008,28 @@ body {
   #logo-container img { max-width: 200px; }
   #truco-text { font-size: 5rem; }
   #truco-text small { font-size: 2rem; }
-  #turn-timer { font-size: 1.2rem; top: 60px; right: 10px; padding: 4px 12px; }
+  .turn-timer { font-size: 1.2rem; top: 60px; right: 10px; padding: 4px 12px; }
+  .chat-container { width: 240px; }
+  .logs-toggle { bottom: 20px; left: 20px; }
 }
 
 @media (max-width: 480px) {
-  .table { grid-template-columns: 68px 1fr 68px; }
-  .card { width: 36px; height: 54px; font-size: 0.95rem; }
-  #logo-container img { max-width: 160px; }
+  body { padding: 5px; }
+  .table { grid-template-columns: 62px 1fr 62px; gap: 4px; min-height: 400px; }
+  .card { width: 34px; height: 50px; font-size: 0.9rem; border-width: 2px; }
+  .card.vira-card { width: 44px; height: 64px; font-size: 1.1rem; }
+  .player-area { padding: 4px 2px; }
+  .player-name { font-size: 0.8rem; }
+  .player-team { font-size: 0.65rem; }
+  .center-area { padding: 8px 6px; gap: 5px; }
+  .score-team { min-width: 70px; font-size: 0.75rem; padding: 4px 6px; }
+  .turn-info { font-size: 0.95rem; padding: 6px 8px; }
+  .menu { padding: 18px 14px; margin-top: 18px; }
+  #logo-container img { max-width: 140px; }
   #truco-text { font-size: 3.5rem; }
   #truco-text small { font-size: 1.5rem; }
+  .turn-timer { font-size: 1rem; top: 50px; right: 5px; padding: 3px 8px; }
+  .chat-container { width: 200px; right: 10px; bottom: 10px; }
+  .chat-messages { max-height: 160px; }
+  .logs-toggle { width: 38px; height: 38px; font-size: 1.2rem; bottom: 15px; left: 15px; }
 }

@@ -7,6 +7,7 @@
  *  - restart: reiniciar a partida completa.
  *  - startGame: iniciar a partida (apenas host).
  *  - turnTimeout: tratar estouro de tempo do turno.
+ *  - elevenDecision: decisão da Mão de Onze.
  * Utiliza a classe Game e as funções de envio de estado/mensagem.
  */
 
@@ -20,9 +21,13 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
       socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
       return;
     }
-    if (!isValidCard(card)) {
-      socket.emit('toast', 'Carta inválida.');
-      return;
+
+    // Se for uma jogada com índice (Mão de Ferro), não valida com isValidCard
+    if (card && card.index === undefined) {
+      if (!isValidCard(card)) {
+        socket.emit('toast', 'Carta inválida.');
+        return;
+      }
     }
 
     const room = roomManager.findRoomBySocket(socket.id);
@@ -210,4 +215,63 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
       sendStateToRoom(io, roomManager, room);
     }
   });
+
+  // Handler para decisão da Mão de Onze
+  socket.on('elevenDecision', (decision) => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+      socket.emit('toast', 'Muitas ações. Aguarde.');
+      return;
+    }
+
+    const room = roomManager.findRoomBySocket(socket.id);
+    if (!room) return;
+    const playerIndex = roomManager.findPlayerIndex(room, socket.id);
+    if (playerIndex === -1) return;
+
+    const game = room.game;
+    if (!game.waitingElevenDecision) {
+      socket.emit('toast', 'Não é hora de decidir a Mão de Onze.');
+      return;
+    }
+
+    if (decision !== 'play' && decision !== 'flee') {
+      socket.emit('toast', 'Decisão inválida.');
+      return;
+    }
+
+    const result = game.handleElevenDecision(playerIndex, decision);
+    if (result) {
+      if (decision === 'flee') {
+        emitRoomMessage(io, roomManager, room, `Time ${game.elevenDecisionTeam + 1} fugiu da Mão de Onze.`);
+      } else {
+        emitRoomMessage(io, roomManager, room, 'Mão de Onze aceita! Vale 3 pontos.');
+      }
+      sendStateToRoom(io, roomManager, room);
+    } else {
+      socket.emit('toast', 'Você não pode decidir agora.');
+    }
+  });
+
+  socket.on('showHandToPartner', () => {
+    if (!actionLimiter.isAllowed(socket.id)) {
+        socket.emit('toast', 'Muitas ações. Aguarde.');
+        return;
+    }
+
+    const room = roomManager.findRoomBySocket(socket.id);
+    if (!room) return;
+    const playerIndex = roomManager.findPlayerIndex(room, socket.id);
+    if (playerIndex === -1) return;
+
+    const game = room.game;
+    if (game.showHandToPartner(playerIndex)) {
+        // Notifica os parceiros que a mão foi revelada
+        const team = game.handRevealTeam;
+        emitRoomMessage(io, roomManager, room, '👀 Cartas reveladas para o parceiro por 5 segundos!');
+        sendStateToRoom(io, roomManager, room);
+    } else {
+        socket.emit('toast', 'Não é possível revelar as cartas agora.');
+    }
+    });
+
 };

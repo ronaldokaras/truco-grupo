@@ -35,7 +35,6 @@ const AudioManager = {
     }
   },
 
-  // Registra nós para parada imediata
   trackNode(osc, gain) {
     this.activeNodes.push({ osc, gain });
     osc.onended = () => {
@@ -43,7 +42,6 @@ const AudioManager = {
     };
   },
 
-  // Para todos os nós ativos (usado ao silenciar)
   stopAllNodes() {
     this.activeNodes.forEach(({ osc, gain }) => {
       try { osc.stop(); } catch (e) {}
@@ -67,7 +65,6 @@ const AudioManager = {
     osc.stop(this.audioCtx.currentTime + duration);
   },
 
-  // Efeitos sonoros específicos
   playCardSound() {
     this.playTone(600, 0.15, 'triangle', 0.2);
     setTimeout(() => this.playTone(800, 0.1, 'sine', 0.15), 50);
@@ -96,7 +93,6 @@ const AudioManager = {
     setTimeout(() => this.playTone(1000, 0.5, 'triangle', 0.4), 600);
   },
 
-  // Música de fundo (loop de acordes)
   startMusic() {
     if (!this.audioEnabled || !this.audioCtx) return;
     const chords = [
@@ -141,7 +137,6 @@ const AudioManager = {
       clearTimeout(this.musicTimeout);
       this.musicTimeout = null;
     }
-    // Para também os nós que estão tocando agora
     this.stopAllNodes();
   },
 
@@ -152,10 +147,8 @@ const AudioManager = {
       this.startMusic();
     } else {
       this.stopMusic();
-      // Garante silêncio total imediato
       if (this.masterGain) this.masterGain.gain.value = 0;
     }
-    // Se reativar, restaura o volume do masterGain
     if (this.audioEnabled && this.masterGain) {
       this.masterGain.gain.value = 0.6;
     }
@@ -486,7 +479,6 @@ socket.on('trucoEffect', (data) => {
   setTimeout(() => {
     trucoOverlay.style.display = 'none';
   }, 2500);
-  // Toca som de truco ao receber o efeito
   AudioManager.playTrucoSound();
 });
 
@@ -535,7 +527,8 @@ function canPlay(state) {
     state.turn === state.yourIndex &&
     !state.challenge &&
     state.handWinnerTeam === null &&
-    !state.gameOver;
+    !state.gameOver &&
+    !state.waitingElevenDecision;
 }
 
 function renderWaiting(state) {
@@ -574,6 +567,7 @@ function renderGame(state) {
 
   const playable = canPlay(state);
 
+  // ----- Loop dos jogadores (com melhorias) -----
   state.players.forEach((p, idx) => {
     const div = document.createElement('div');
     const posClass = getRelativePosClass(idx, state.yourIndex, state.maxPlayers);
@@ -608,20 +602,45 @@ function renderGame(state) {
     table.appendChild(div);
 
     const handDiv = document.getElementById(`hand-${idx}`);
-    if (isMe && state.yourHand) {
+
+    // ----- 1. Ver cartas do parceiro (se permitido) -----
+    if (isPartner && state.canSeePartnerHand && state.partnerHand) {
+      state.partnerHand.forEach(card => {
+        const cardEl = document.createElement('div');
+        cardEl.className = `card ${isRedSuit(card.suit) ? 'red' : ''} partner-card`;
+        cardEl.innerHTML = `<div>${card.rank}</div><div>${suitSymbol(card.suit)}</div>`;
+        handDiv.appendChild(cardEl);
+      });
+    }
+    // ----- 2. Jogador atual (eu) -----
+    else if (isMe && state.yourHand) {
       state.yourHand.forEach(card => {
         const cardEl = document.createElement('div');
-        cardEl.className = `card ${isRedSuit(card.suit) ? 'red' : ''} yours${playable ? '' : ' disabled'}`;
-        cardEl.innerHTML = `<div>${card.rank}</div><div>${suitSymbol(card.suit)}</div>`;
-        if (playable) {
-          cardEl.onclick = () => {
-            AudioManager.playCardSound();
-            socket.emit('playCard', { suit: card.suit, rank: card.rank });
-          };
+        if (card.hidden) {
+          // Mão de Ferro: carta oculta, mas clicável
+          cardEl.className = 'card hidden clickable';
+          cardEl.dataset.index = card.index;
+          if (playable) {
+            cardEl.onclick = () => {
+              AudioManager.playCardSound();
+              socket.emit('playCard', { index: card.index });
+            };
+          }
+        } else {
+          cardEl.className = `card ${isRedSuit(card.suit) ? 'red' : ''} yours${playable ? '' : ' disabled'}`;
+          cardEl.innerHTML = `<div>${card.rank}</div><div>${suitSymbol(card.suit)}</div>`;
+          if (playable) {
+            cardEl.onclick = () => {
+              AudioManager.playCardSound();
+              socket.emit('playCard', { suit: card.suit, rank: card.rank });
+            };
+          }
         }
         handDiv.appendChild(cardEl);
       });
-    } else {
+    }
+    // ----- 3. Demais jogadores (cartas ocultas) -----
+    else {
       for (let i = 0; i < (p.cardCount || 0); i++) {
         const hidden = document.createElement('div');
         hidden.className = 'card hidden';
@@ -630,8 +649,17 @@ function renderGame(state) {
     }
   });
 
+  // ----- Área central (com banner especial) -----
   const centerDiv = document.createElement('div');
   centerDiv.className = 'center-area';
+
+  // Banner especial (Mão de Ferro / Mão de Onze)
+  let specialBannerHtml = '';
+  if (state.specialHand === 'iron') {
+    specialBannerHtml = `<div class="special-banner iron-banner">🔥 Mão de Ferro: jogando no escuro!</div>`;
+  } else if (state.specialHand === 'eleven') {
+    specialBannerHtml = `<div class="special-banner eleven-banner">🃏 Mão de Onze!</div>`;
+  }
 
   const viraIsRed = state.vira && isRedSuit(state.vira.suit);
   const viraHtml = state.vira
@@ -667,6 +695,7 @@ function renderGame(state) {
   const turnName = state.turnPlayerName || '?';
 
   centerDiv.innerHTML = `
+    ${specialBannerHtml}
     <div class="vira-area">
       ${viraHtml}
       <div class="vira-info">
@@ -691,6 +720,7 @@ function renderGame(state) {
   `;
   table.appendChild(centerDiv);
 
+  // Cartas jogadas na mesa
   const boardDiv = document.getElementById('board-cards');
   if (state.rounds && state.rounds[state.currentRound]) {
     state.rounds[state.currentRound].cards.forEach(play => {
@@ -705,6 +735,7 @@ function renderGame(state) {
     });
   }
 
+  // Desafio (truco)
   const challengeArea = document.getElementById('challenge-area');
   if (state.challenge) {
     const ch = state.challenge;
@@ -727,8 +758,27 @@ function renderGame(state) {
     }
   }
 
+  // ----- Botões de ação (incluindo Mão de Onze) -----
   const actionDiv = document.getElementById('action-buttons');
-  if (playable) {
+
+  // Decisão da Mão de Onze (prioridade máxima)
+  if (state.waitingElevenDecision && state.elevenDecisionTeam === state.yourTeam) {
+    const actionDiv = document.getElementById('action-buttons');
+    // Botão "Ver cartas do parceiro" apenas em duplas (maxPlayers === 4)
+    const showPartnerButton = state.maxPlayers === 4
+      ? `<button class="btn" onclick="socket.emit('showHandToPartner')">👀 Ver cartas do parceiro (5s)</button>`
+      : '';
+    actionDiv.innerHTML = `
+      <div class="eleven-decision">
+        <p>Vocês estão na Mão de Onze!</p>
+        ${showPartnerButton}
+        <button class="btn" onclick="socket.emit('elevenDecision', 'play')">JOGAR (3 pontos)</button>
+        <button class="btn btn-flee" onclick="socket.emit('elevenDecision', 'flee')">FUGIR (+1 para eles)</button>
+      </div>
+    `;
+  }
+  // Senão, botão de Truco (se for a vez do jogador)
+  else if (playable) {
     const nextLevel = { 1: 3, 3: 6, 6: 9, 9: 12 }[state.currentHandValue];
     if (nextLevel) {
       actionDiv.innerHTML = `<button class="btn truco" onclick="AudioManager.playTrucoSound(); socket.emit('truco')">🗣️ PEDIR TRUCO!</button>`;
@@ -737,6 +787,7 @@ function renderGame(state) {
     }
   }
 
+  // Mão vencida (aguardando próxima)
   if (state.handWinnerTeam !== null && !state.gameOver) {
     const winnerName = state.maxPlayers === 2
       ? state.players[state.handWinnerTeam]?.name
@@ -746,6 +797,7 @@ function renderGame(state) {
     actionDiv.innerHTML = `<button class="btn next" onclick="socket.emit('nextHand')">Próxima Mão ➡️</button>`;
   }
 
+  // Fim de jogo
   if (state.gameOver) {
     const vencedor = state.maxPlayers === 2
       ? state.players[state.winnerTeam]?.name

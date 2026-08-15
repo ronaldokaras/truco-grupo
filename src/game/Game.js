@@ -1,19 +1,13 @@
 /**
  * Classe principal que orquestra a lógica de uma partida de Truco.
- * Gerencia jogadores, baralho, vira, rodadas, placar, pedidos de truco e estado geral.
+ * Gerencia jogadores, baralho, vira, rodadas, placar, pedidos de truco,
+ * Mão de Onze e Mão de Ferro.
  * Não conhece Socket.IO — apenas recebe entradas e retorna resultados.
- * Métodos importantes:
- *  - playCard: processa a jogada de uma carta.
- *  - requestTruco: inicia um pedido de truco.
- *  - respondTruco: trata a resposta ao truco (aceitar, fugir, aumentar).
- *  - timeout: finaliza a mão por estouro de tempo.
- *  - getStateForPlayer / getSpectatorState: retornam o estado visível para cada tipo de cliente.
- *  - resetForNextHand / restartGame / abortGame: controlam a transição entre mãos/partidas.
  */
 
 const Deck = require('./Deck');
 const Player = require('./Player');
-const { RANKS } = require('./constants');
+const { RANKS, SPECIAL_HANDS } = require('./constants');
 const {
   compareCards,
   evaluateHandWinner,
@@ -43,15 +37,27 @@ class Game {
     this.currentRound = 0;
     this.turnPlayerIndex = starter;
     this.roundStarter = starter;
+    this.handStarter = starter;
     this.handWinnerTeam = null;
     this.challenge = null;
     this.gameOver = false;
     this.winnerTeam = null;
     this.scores = [0, 0];
-    this.handStarter = starter;
     this.started = false;
     this.logs = [];
     this.turnTimeLimit = null;
+
+    // Estados para Mão de 11 e Mão de Ferro
+    this.specialHand = null;          // 'eleven' ou 'iron' ou null
+    this.elevenTeam = null;           // time que está em Mão de Onze (se aplicável)
+    this.waitingElevenDecision = false; // se esperando decisão do time
+    this.elevenDecisionTeam = null;   // time que deve decidir
+    this.allowTruco = true;           // false durante Mão de Onze/Ferro
+    this.ironHand = false;            // true se for Mão de Ferro
+
+    // Novos campos para revelação temporária da mão do parceiro
+    this.handRevealExpiresAt = null;  // timestamp até quando a mão fica visível
+    this.handRevealTeam = null;       // time que está com a mão revelada
   }
 
   _createPlayers(count) {
@@ -95,6 +101,24 @@ class Game {
     });
   }
 
+  /**
+   * Revela temporariamente (5s) a mão do parceiro para um jogador do time
+   * durante a Mão de Onze.
+   */
+  showHandToPartner(playerIndex) {
+    // Apenas durante a Mão de Onze e enquanto espera decisão
+    if (!this.waitingElevenDecision || this.elevenDecisionTeam === null) return false;
+    const player = this.players[playerIndex];
+    if (!player || player.team !== this.elevenDecisionTeam) return false;
+
+    // Define tempo de expiração (5 segundos a partir de agora)
+    this.handRevealExpiresAt = Date.now() + 5000;
+    this.handRevealTeam = player.team;
+    this.addLog('Sistema', `${player.name} revelou as cartas para o parceiro`, '5 segundos');
+
+    return true;
+  }
+
   getStateForPlayer(playerId, roomCode) {
     const playerIndex = this.players.findIndex(p => p.id === playerId);
     if (playerIndex === -1) return null;
@@ -116,15 +140,46 @@ class Game {
       ];
     }
 
-    const sortedHand = sortHand(this.players[playerIndex].hand, this.manilhaRank);
+    // --- Lógica para mão do jogador (suporte a Mão de Ferro com índices) ---
+    let yourHand;
+    if (this.ironHand) {
+      // Mão de Ferro: jogador não pode ver as cartas, mas recebe índices para jogar
+      yourHand = this.players[playerIndex].hand.map((card, index) => ({
+        hidden: true,
+        index: index,
+        suit: null,
+        rank: null
+      }));
+    } else {
+      yourHand = sortHand(this.players[playerIndex].hand, this.manilhaRank);
+    }
+
+    // --- Lógica para mão do parceiro (visível apenas na Mão de Onze com tempo) ---
+    let partnerHand = null;
+    // Verifica se está na Mão de Onze e se o jogador pertence ao time que deve decidir
+    const isElevenTeam = this.specialHand === SPECIAL_HANDS.ELEVEN &&
+      this.elevenTeam === this.players[playerIndex].team;
+
+    // Verifica se o tempo de revelação ainda é válido
+    const revealValid = this.handRevealExpiresAt !== null &&
+      Date.now() < this.handRevealExpiresAt &&
+      this.handRevealTeam === this.players[playerIndex].team;
+
+    // O parceiro pode ver a mão se estiver na Mão de Onze E o tempo de revelação for válido
+    const canSeePartnerHand = isElevenTeam && revealValid;
+
+    if (canSeePartnerHand && partnerIndex !== -1) {
+      partnerHand = sortHand(this.players[partnerIndex].hand, this.manilhaRank);
+    }
 
     return {
       roomCode,
       yourIndex: playerIndex,
       yourTeam: this.players[playerIndex].team,
-      yourHand: sortedHand,
+      yourHand,
       partnerIndex,
       partnerName,
+      partnerHand, // pode ser null
       teamNames,
       players: this.players.map(p => ({
         name: p.name,
@@ -150,7 +205,19 @@ class Game {
       started: this.started,
       yourToken: this.players[playerIndex].token,
       turnTimeLimit: this.turnTimeLimit,
-      logs: this.logs.slice(-50)
+      logs: this.logs.slice(-50),
+
+      // Campos para Mão de 11/Ferro
+      specialHand: this.specialHand,
+      elevenTeam: this.elevenTeam,
+      waitingElevenDecision: this.waitingElevenDecision,
+      elevenDecisionTeam: this.elevenDecisionTeam,
+      allowTruco: this.allowTruco,
+      ironHand: this.ironHand,
+
+      // Campos para revelação da mão do parceiro
+      canSeePartnerHand,
+      handRevealExpiresAt: this.handRevealExpiresAt
     };
   }
 
@@ -185,19 +252,44 @@ class Game {
           ]
         : null,
       turnTimeLimit: this.turnTimeLimit,
-      logs: this.logs.slice(-50)
+      logs: this.logs.slice(-50),
+      // Campos para Mão de 11/Ferro
+      specialHand: this.specialHand,
+      elevenTeam: this.elevenTeam,
+      waitingElevenDecision: this.waitingElevenDecision,
+      elevenDecisionTeam: this.elevenDecisionTeam,
+      allowTruco: this.allowTruco,
+      ironHand: this.ironHand,
+      handRevealExpiresAt: this.handRevealExpiresAt
     };
   }
 
+  /**
+   * Joga uma carta.
+   * Durante a Mão de Ferro, aceita card.index para jogar às cegas.
+   * Impede jogadas enquanto waitingElevenDecision for true.
+   */
   playCard(playerIndex, card) {
-    if (!this.started || this.gameOver || this.handWinnerTeam !== null || this.challenge) return false;
+    // 🔹 ADICIONADA A CONDIÇÃO this.waitingElevenDecision
+    if (!this.started || this.gameOver || this.handWinnerTeam !== null || this.challenge || this.waitingElevenDecision) return false;
     if (playerIndex !== this.turnPlayerIndex) return false;
 
     const player = this.players[playerIndex];
-    const cardIndex = player.hand.findIndex(
-      c => c.suit === card.suit && c.rank === card.rank
-    );
-    if (cardIndex === -1) return false;
+    let cardIndex;
+
+    // Verifica se é Mão de Ferro e se card tem índice
+    if (this.ironHand && card && card.index !== undefined) {
+      // Jogada às cegas: usa o índice
+      cardIndex = card.index;
+      if (cardIndex < 0 || cardIndex >= player.hand.length) return false;
+    } else {
+      // Jogada normal: procura pela carta (suit e rank)
+      if (!card || !card.suit || !card.rank) return false;
+      cardIndex = player.hand.findIndex(
+        c => c.suit === card.suit && c.rank === card.rank
+      );
+      if (cardIndex === -1) return false;
+    }
 
     const playedCard = player.hand.splice(cardIndex, 1)[0];
     this.addLog(player.name, 'Jogou carta', `${playedCard.rank} de ${playedCard.suit}`);
@@ -261,6 +353,7 @@ class Game {
   }
 
   requestTruco(playerIndex) {
+    if (!this.allowTruco) return false; // Bloqueia truco em Mão de Onze/Ferro
     if (!this.started || this.gameOver || this.challenge || this.handWinnerTeam !== null) return false;
     if (playerIndex !== this.turnPlayerIndex) return false;
 
@@ -355,7 +448,45 @@ class Game {
     return true;
   }
 
+  handleElevenDecision(playerIndex, decision) {
+    if (!this.waitingElevenDecision) return false;
+    if (this.elevenDecisionTeam === null) return false;
+    const player = this.players[playerIndex];
+    if (!player || player.team !== this.elevenDecisionTeam) return false;
+
+    if (decision === 'flee') {
+      const opponentTeam = 1 - this.elevenDecisionTeam;
+      this.scores[opponentTeam] += 1;
+      this.addLog('Sistema', 'Time fugiu da Mão de Onze', `Time ${opponentTeam + 1} ganha 1 ponto`);
+      if (this.scores[opponentTeam] >= config.WINNING_SCORE) {
+        this.gameOver = true;
+        this.winnerTeam = opponentTeam;
+        this.addLog('Sistema', 'Time venceu a partida!', '');
+      }
+      // Limpa o estado de decisão
+      this.waitingElevenDecision = false;
+      this.elevenDecisionTeam = null;
+      if (!this.gameOver) this.resetForNextHand();
+      return true;
+    }
+
+    if (decision === 'play') {
+      this.waitingElevenDecision = false;
+      this.elevenDecisionTeam = null;
+      this.currentHandValue = 3;
+      this.allowTruco = false; // Já está false se specialHand === 'eleven'
+      this.addLog('Sistema', 'Time aceitou jogar a Mão de Onze', 'Vale 3 pontos');
+      return true;
+    }
+
+    return false;
+  }
+
   resetForNextHand() {
+    this._prepareNextHand();
+  }
+
+  _prepareNextHand() {
     const oldPlayers = this.players.map(p => ({
       id: p.id,
       token: p.token,
@@ -383,6 +514,27 @@ class Game {
     fresh.turnPlayerIndex = nextStarter;
     fresh.roundStarter = nextStarter;
 
+    // Verifica se algum time está em Mão de Onze
+    const teamWithEleven = fresh.scores.findIndex(s => s === 11);
+    const bothEleven = fresh.scores[0] === 11 && fresh.scores[1] === 11;
+
+    if (bothEleven) {
+      // Mão de Ferro
+      fresh.specialHand = SPECIAL_HANDS.IRON;
+      fresh.ironHand = true;
+      fresh.allowTruco = false;
+      fresh.addLog('Sistema', 'Mão de Ferro!', 'Ninguém pode olhar as cartas');
+    } else if (teamWithEleven !== -1) {
+      // Mão de Onze
+      fresh.specialHand = SPECIAL_HANDS.ELEVEN;
+      fresh.elevenTeam = teamWithEleven;
+      fresh.waitingElevenDecision = true;
+      fresh.elevenDecisionTeam = teamWithEleven;
+      fresh.allowTruco = false;
+      fresh.addLog('Sistema', `Mão de Onze do Time ${teamWithEleven + 1}`, 'Aguardando decisão');
+    }
+
+    // Copia fresh para this
     Object.assign(this, fresh);
   }
 
@@ -425,6 +577,14 @@ class Game {
     this.logs = [];
     this.challenge = null;
     this.handWinnerTeam = null;
+    this.specialHand = null;
+    this.elevenTeam = null;
+    this.waitingElevenDecision = false;
+    this.elevenDecisionTeam = null;
+    this.allowTruco = true;
+    this.ironHand = false;
+    this.handRevealExpiresAt = null;
+    this.handRevealTeam = null;
 
     const deck = new Deck();
     for (const p of this.players) {

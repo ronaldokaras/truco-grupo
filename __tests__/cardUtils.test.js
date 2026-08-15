@@ -20,15 +20,15 @@ describe('compareCards', () => {
   });
 
   test('manilha de naipe maior vence (copas > espadas)', () => {
-  const espadas = new Card('espadas', '7');
-  const copas = new Card('copas', '7');
-  expect(compareCards(espadas, copas, '7')).toBe('B');
-});
+    const espadas = new Card('espadas', '7');
+    const copas = new Card('copas', '7');
+    expect(compareCards(espadas, copas, '7')).toBe('B');
+  });
 
   test('carta normal maior vence', () => {
     const a = new Card('paus', 'A');
     const b = new Card('copas', 'K');
-    expect(compareCards(a, b, 'Q')).toBe('A'); // A > K
+    expect(compareCards(a, b, 'Q')).toBe('A');
   });
 });
 
@@ -47,6 +47,10 @@ describe('evaluateHandWinner', () => {
 
   test('primeira rodada empate, segunda time 1 vence -> time 1', () => {
     expect(evaluateHandWinner([null, 1], 0)).toBe(1);
+  });
+
+  test('todas as três rodadas empatadas retornam null (ninguém pontua)', () => {
+    expect(evaluateHandWinner([null, null, null], 0)).toBeNull();
   });
 });
 
@@ -68,8 +72,8 @@ describe('sortHand', () => {
       new Card('copas', '3'),
     ];
     const sorted = sortHand(hand, '7');
-    expect(sorted[0].suit).toBe('ouros'); // manilha
-    expect(sorted[1].suit).toBe('copas'); // 3 > 4
+    expect(sorted[0].suit).toBe('ouros');
+    expect(sorted[1].suit).toBe('copas');
     expect(sorted[2].suit).toBe('paus');
   });
 });

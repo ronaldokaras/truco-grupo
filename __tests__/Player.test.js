@@ -8,7 +8,7 @@ const Player = require('../src/game/Player');
 describe('Player', () => {
   test('deve criar jogador com nome padrão e time correto', () => {
     const p = new Player(null, 1, 2);
-    expect(p.name).toBe('Jogador 3'); // índice 2 => "Jogador 3"
+    expect(p.name).toBe('Jogador 3');
     expect(p.team).toBe(1);
     expect(p.connected).toBe(false);
     expect(p.hand).toEqual([]);

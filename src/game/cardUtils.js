@@ -31,15 +31,19 @@ function compareCards(cardA, cardB, manilhaRank) {
 function evaluateHandWinner(roundResults, starterTeam) {
   const [r1, r2, r3] = roundResults;
 
+  // Se já temos duas rodadas com vencedor definido ou empate + vitória
   if (roundResults.length >= 2) {
     if (r1 !== null && (r2 === r1 || r2 === null)) return r1;
     if (r1 === null && r2 !== null) return r2;
   }
 
+  // Se temos três rodadas
   if (roundResults.length === 3) {
     if (r3 !== null) return r3;
+    // Se a terceira empatou, mas a primeira teve vencedor
     if (r1 !== null) return r1;
-    return starterTeam;
+    // Se todas as três empataram, ninguém pontua
+    return null;
   }
 
   return null;

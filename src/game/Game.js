@@ -185,7 +185,8 @@ class Game {
         name: p.name,
         team: p.team,
         connected: p.connected,
-        cardCount: p.hand.length
+        cardCount: p.hand.length,
+        isBot: p.isBot               // 🔹 ADICIONADO
       })),
       vira: this.vira,
       manilhaRank: this.manilhaRank,
@@ -228,7 +229,8 @@ class Game {
         name: p.name,
         team: p.team,
         connected: p.connected,
-        cardCount: p.hand.length
+        cardCount: p.hand.length,
+        isBot: p.isBot               // 🔹 ADICIONADO
       })),
       vira: this.vira,
       manilhaRank: this.manilhaRank,
@@ -270,7 +272,6 @@ class Game {
    * Impede jogadas enquanto waitingElevenDecision for true.
    */
   playCard(playerIndex, card) {
-    // 🔹 ADICIONADA A CONDIÇÃO this.waitingElevenDecision
     if (!this.started || this.gameOver || this.handWinnerTeam !== null || this.challenge || this.waitingElevenDecision) return false;
     if (playerIndex !== this.turnPlayerIndex) return false;
 
@@ -491,7 +492,8 @@ class Game {
       id: p.id,
       token: p.token,
       name: p.name,
-      connected: p.connected
+      connected: p.connected,
+      isBot: p.isBot                     // 🔹 ADICIONADO
     }));
     const scores = [...this.scores];
     const logs = [...this.logs];
@@ -504,6 +506,7 @@ class Game {
       fresh.players[i].token = oldPlayers[i].token;
       fresh.players[i].name = oldPlayers[i].name;
       fresh.players[i].connected = oldPlayers[i].connected;
+      fresh.players[i].isBot = oldPlayers[i].isBot; // 🔹 ADICIONADO
     }
 
     fresh.scores = scores;
@@ -543,7 +546,8 @@ class Game {
       id: p.id,
       token: p.token,
       name: p.name,
-      connected: p.connected
+      connected: p.connected,
+      isBot: p.isBot                     // 🔹 ADICIONADO
     }));
     const logs = [...this.logs];
     const turnTimeLimit = this.turnTimeLimit;
@@ -554,6 +558,7 @@ class Game {
       fresh.players[i].token = oldPlayers[i].token;
       fresh.players[i].name = oldPlayers[i].name;
       fresh.players[i].connected = oldPlayers[i].connected;
+      fresh.players[i].isBot = oldPlayers[i].isBot; // 🔹 ADICIONADO
     }
 
     fresh.scores = [0, 0];

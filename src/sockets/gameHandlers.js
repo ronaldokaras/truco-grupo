@@ -1,33 +1,18 @@
 /**
  * Handlers relacionados às ações do jogo:
- *  - playCard: jogar uma carta.
- *  - truco: pedir truco.
- *  - respondTruco: responder a um pedido de truco.
- *  - nextHand: avançar para a próxima mão.
- *  - restart: reiniciar a partida completa.
- *  - startGame: iniciar a partida (apenas host).
- *  - turnTimeout: tratar estouro de tempo do turno.
- *  - elevenDecision: decisão da Mão de Onze.
- * Utiliza a classe Game e as funções de envio de estado/mensagem.
+ *  - playCard, truco, respondTruco, nextHand, restart, startGame, turnTimeout, elevenDecision, showHandToPartner.
+ * Utiliza a classe Game e as funções de envio de estado/mensagem, com suporte a bots.
  */
 
 const { TRUCO_LEVEL_NAMES } = require('../game/constants');
-const { sendStateToRoom, emitRoomMessage } = require('./utils');
+const { sendStateAndCheckBots, emitRoomMessage } = require('./utils');
 const { isValidCard, isValidTrucoResponse } = require('../utils/validators');
 
-module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
+module.exports = function gameHandlers(io, socket, roomManager, actionLimiter, botManager) {
   socket.on('playCard', (card) => {
     if (!actionLimiter.isAllowed(socket.id)) {
       socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
       return;
-    }
-
-    // Se for uma jogada com índice (Mão de Ferro), não valida com isValidCard
-    if (card && card.index === undefined) {
-      if (!isValidCard(card)) {
-        socket.emit('toast', 'Carta inválida.');
-        return;
-      }
     }
 
     const room = roomManager.findRoomBySocket(socket.id);
@@ -36,12 +21,26 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
     if (playerIndex === -1) return;
 
     const game = room.game;
+
+    // Validação de carta
+    if (game.ironHand) {
+      if (typeof card.index !== 'number') {
+        socket.emit('toast', 'Jogada inválida.');
+        return;
+      }
+    } else {
+      if (!isValidCard(card)) {
+        socket.emit('toast', 'Carta inválida.');
+        return;
+      }
+    }
+
     if (game.playCard(playerIndex, card)) {
-      sendStateToRoom(io, roomManager, room);
+      sendStateAndCheckBots(io, roomManager, room, botManager);
 
       if (game.turnTimeLimit && game.started && !game.gameOver) {
         const turnPlayer = game.players[game.turnPlayerIndex];
-        if (turnPlayer && turnPlayer.id) {
+        if (turnPlayer && turnPlayer.id && !turnPlayer.isBot) {
           io.to(turnPlayer.id).emit('turnTimer', { timeLimit: game.turnTimeLimit });
         }
       }
@@ -52,7 +51,7 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
   socket.on('truco', () => {
     if (!actionLimiter.isAllowed(socket.id)) {
-      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      socket.emit('toast', 'Muitas ações rapidamente.');
       return;
     }
 
@@ -74,12 +73,12 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
     emitRoomMessage(io, roomManager, room, `🗣️ ${playerName} pediu ${levelName}!`);
     io.to(room.code).emit('trucoEffect', { level, player: playerName });
-    sendStateToRoom(io, roomManager, room);
+    sendStateAndCheckBots(io, roomManager, room, botManager);
   });
 
   socket.on('respondTruco', (response) => {
     if (!actionLimiter.isAllowed(socket.id)) {
-      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      socket.emit('toast', 'Muitas ações rapidamente.');
       return;
     }
     if (!isValidTrucoResponse(response)) {
@@ -102,7 +101,7 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
       if (response === 'accept' || response === 'raise') {
         io.to(room.code).emit('trucoEffect', { level: game.currentHandValue, player: name });
       }
-      sendStateToRoom(io, roomManager, room);
+      sendStateAndCheckBots(io, roomManager, room, botManager);
     } else {
       socket.emit('toast', 'Resposta inválida.');
     }
@@ -117,11 +116,11 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
     game.resetForNextHand();
     emitRoomMessage(io, roomManager, room, 'Nova mão!');
-    sendStateToRoom(io, roomManager, room);
+    sendStateAndCheckBots(io, roomManager, room, botManager);
 
     if (game.turnTimeLimit && game.started && !game.gameOver) {
       const turnPlayer = game.players[game.turnPlayerIndex];
-      if (turnPlayer && turnPlayer.id) {
+      if (turnPlayer && turnPlayer.id && !turnPlayer.isBot) {
         io.to(turnPlayer.id).emit('turnTimer', { timeLimit: game.turnTimeLimit });
       }
     }
@@ -137,11 +136,11 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
     game.restartGame();
     game.addLog('Sistema', 'Nova partida iniciada', '');
     emitRoomMessage(io, roomManager, room, '🔄 Nova partida iniciada!');
-    sendStateToRoom(io, roomManager, room);
+    sendStateAndCheckBots(io, roomManager, room, botManager);
 
     if (game.turnTimeLimit && game.started) {
       const turnPlayer = game.players[game.turnPlayerIndex];
-      if (turnPlayer && turnPlayer.id) {
+      if (turnPlayer && turnPlayer.id && !turnPlayer.isBot) {
         io.to(turnPlayer.id).emit('turnTimer', { timeLimit: game.turnTimeLimit });
       }
     }
@@ -149,7 +148,7 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
   socket.on('startGame', ({ timeLimit }) => {
     if (!actionLimiter.isAllowed(socket.id)) {
-      socket.emit('toast', 'Muitas ações rapidamente. Aguarde um instante.');
+      socket.emit('toast', 'Muitas ações rapidamente.');
       return;
     }
 
@@ -184,19 +183,14 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
     game.turnTimeLimit = timeLimit || null;
     game.started = true;
     game.addLog('Sistema', 'Partida iniciada', timeLimit ? `${timeLimit}s por turno` : 'sem limite de tempo');
-    emitRoomMessage(
-      io,
-      roomManager,
-      room,
-      `🎮 Partida iniciada! ${timeLimit ? `Tempo por turno: ${timeLimit}s` : 'Sem limite de tempo'}`
-    );
+    emitRoomMessage(io, roomManager, room, `🎮 Partida iniciada! ${timeLimit ? `Tempo por turno: ${timeLimit}s` : 'Sem limite de tempo'}`);
 
     io.to(room.code).emit('gameStarted', { timeLimit: game.turnTimeLimit });
-    sendStateToRoom(io, roomManager, room);
+    sendStateAndCheckBots(io, roomManager, room, botManager);
 
     if (game.turnTimeLimit) {
       const turnPlayer = game.players[game.turnPlayerIndex];
-      if (turnPlayer && turnPlayer.id) {
+      if (turnPlayer && turnPlayer.id && !turnPlayer.isBot) {
         io.to(turnPlayer.id).emit('turnTimer', { timeLimit: game.turnTimeLimit });
       }
     }
@@ -212,11 +206,10 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
     const game = room.game;
     if (game.timeout(playerIndex)) {
       emitRoomMessage(io, roomManager, room, `⏰ ${game.players[playerIndex]?.name} perdeu a mão por tempo!`);
-      sendStateToRoom(io, roomManager, room);
+      sendStateAndCheckBots(io, roomManager, room, botManager);
     }
   });
 
-  // Handler para decisão da Mão de Onze
   socket.on('elevenDecision', (decision) => {
     if (!actionLimiter.isAllowed(socket.id)) {
       socket.emit('toast', 'Muitas ações. Aguarde.');
@@ -246,7 +239,7 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
       } else {
         emitRoomMessage(io, roomManager, room, 'Mão de Onze aceita! Vale 3 pontos.');
       }
-      sendStateToRoom(io, roomManager, room);
+      sendStateAndCheckBots(io, roomManager, room, botManager);
     } else {
       socket.emit('toast', 'Você não pode decidir agora.');
     }
@@ -254,8 +247,8 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
   socket.on('showHandToPartner', () => {
     if (!actionLimiter.isAllowed(socket.id)) {
-        socket.emit('toast', 'Muitas ações. Aguarde.');
-        return;
+      socket.emit('toast', 'Muitas ações. Aguarde.');
+      return;
     }
 
     const room = roomManager.findRoomBySocket(socket.id);
@@ -265,13 +258,16 @@ module.exports = function gameHandlers(io, socket, roomManager, actionLimiter) {
 
     const game = room.game;
     if (game.showHandToPartner(playerIndex)) {
-        // Notifica os parceiros que a mão foi revelada
-        const team = game.handRevealTeam;
-        emitRoomMessage(io, roomManager, room, '👀 Cartas reveladas para o parceiro por 5 segundos!');
-        sendStateToRoom(io, roomManager, room);
+      emitRoomMessage(io, roomManager, room, '👀 Cartas reveladas para o parceiro por 5 segundos!');
+      sendStateAndCheckBots(io, roomManager, room, botManager);
+      // Agenda ocultar após 5 segundos
+      setTimeout(() => {
+        if (room.game === game) {
+          sendStateAndCheckBots(io, roomManager, room, botManager);
+        }
+      }, 5000);
     } else {
-        socket.emit('toast', 'Não é possível revelar as cartas agora.');
+      socket.emit('toast', 'Não é possível revelar as cartas agora.');
     }
-    });
-
+  });
 };

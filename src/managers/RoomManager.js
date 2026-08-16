@@ -70,6 +70,21 @@ class RoomManager {
       }
     }, config.CLEANUP_INTERVAL_MS);
   }
+
+  createBot(room, name) {
+    const game = room.game;
+    const freeSlot = game.players.findIndex(p => !p.connected && !p.isBot);
+    if (freeSlot === -1) return null;
+
+    const bot = game.players[freeSlot];
+    bot.id = `bot-${room.code}-${freeSlot}-${Date.now()}`;
+    bot.token = ''; // bots não reconectam
+    bot.name = name || `Bot ${freeSlot + 1}`;
+    bot.connected = true;
+    bot.isBot = true;
+    return bot;
+  }
+
 }
 
 module.exports = new RoomManager();

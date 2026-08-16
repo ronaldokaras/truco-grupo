@@ -2,7 +2,7 @@
  * Funções auxiliares para envio de estado e mensagens via Socket.IO.
  *  - sendStateToRoom: envia o estado atual para todos os jogadores e espectadores.
  *  - emitRoomMessage: envia uma mensagem de toast para todos na sala.
- * Centralizam a lógica de notificação e mantêm os handlers mais limpos.
+ *  - sendStateAndCheckBots: envia o estado e agenda ações dos bots.
  */
 
 function sendStateToRoom(io, roomManager, room) {
@@ -11,7 +11,8 @@ function sendStateToRoom(io, roomManager, room) {
   roomManager.touchRoom(room);
 
   game.players.forEach(p => {
-    if (p.id && p.connected) {
+    // Não envia estado para bots (eles não têm socket)
+    if (p.id && p.connected && !p.isBot) {
       const sock = io.sockets.sockets.get(p.id);
       if (sock) sock.emit('gameState', game.getStateForPlayer(p.id, room.code));
     }
@@ -28,7 +29,7 @@ function emitRoomMessage(io, roomManager, room, msg) {
   if (!game) return;
 
   const ids = new Set([
-    ...game.players.filter(p => p.id).map(p => p.id),
+    ...game.players.filter(p => p.id && !p.isBot).map(p => p.id),
     ...room.spectators
   ]);
 
@@ -38,7 +39,15 @@ function emitRoomMessage(io, roomManager, room, msg) {
   });
 }
 
+function sendStateAndCheckBots(io, roomManager, room, botManager) {
+  sendStateToRoom(io, roomManager, room);
+  if (botManager) {
+    botManager.scheduleBotActions(io, roomManager, room);
+  }
+}
+
 module.exports = {
   sendStateToRoom,
-  emitRoomMessage
+  emitRoomMessage,
+  sendStateAndCheckBots
 };

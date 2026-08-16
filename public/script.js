@@ -1,7 +1,7 @@
 /**
  * Lógica do cliente (frontend) do Trucou!
  * Gerencia a interface, conexão Socket.IO e eventos recebidos do servidor.
- * Inclui sistema de áudio (música de fundo e efeitos sonoros).
+ * Inclui sistema de áudio (música de fundo e efeitos sonoros) e suporte a bots.
  */
 
 const socket = io({ transports: ['websocket', 'polling'] });
@@ -14,7 +14,7 @@ const AudioManager = {
   musicStep: 0,
   masterGain: null,
   sfxGain: null,
-  activeNodes: [], // armazena { osc, gain } para parada imediata
+  activeNodes: [],
 
   ensureContext() {
     if (!this.audioCtx) {
@@ -22,11 +22,11 @@ const AudioManager = {
       if (AudioCtx) {
         this.audioCtx = new AudioCtx();
         this.masterGain = this.audioCtx.createGain();
-        this.masterGain.gain.value = 0.2; // volume mestre (música + efeitos)
+        this.masterGain.gain.value = 0.2;
         this.masterGain.connect(this.audioCtx.destination);
 
         this.sfxGain = this.audioCtx.createGain();
-        this.sfxGain.gain.value = 0.5;    // volume apenas para efeitos
+        this.sfxGain.gain.value = 0.5;
         this.sfxGain.connect(this.masterGain);
       }
     }
@@ -96,10 +96,10 @@ const AudioManager = {
   startMusic() {
     if (!this.audioEnabled || !this.audioCtx) return;
     const chords = [
-      [220.00, 261.63, 329.63], // Am
-      [174.61, 220.00, 261.63], // F
-      [196.00, 246.94, 293.66], // C
-      [196.00, 246.94, 329.63]  // G
+      [220.00, 261.63, 329.63],
+      [174.61, 220.00, 261.63],
+      [196.00, 246.94, 293.66],
+      [196.00, 246.94, 329.63]
     ];
     const stepDuration = 2000;
 
@@ -199,6 +199,14 @@ if (audioToggleBtn) {
     const enabled = AudioManager.toggleAudio();
     audioToggleBtn.textContent = enabled ? '🔊' : '🔇';
     audioToggleBtn.classList.toggle('active', enabled);
+  });
+}
+
+// Botão de adicionar bot (apenas host)
+const addBotBtn = document.getElementById('add-bot-btn');
+if (addBotBtn) {
+  addBotBtn.addEventListener('click', () => {
+    socket.emit('addBot');
   });
 }
 
@@ -444,6 +452,7 @@ socket.on('roomJoined', (data) => {
 
   if (isHost) {
     document.getElementById('host-controls').style.display = 'block';
+    if (addBotBtn) addBotBtn.style.display = 'inline-block';
     document.getElementById('start-game-btn').addEventListener('click', () => {
       const selected = document.querySelector('input[name="timeLimit"]:checked');
       let timeLimit = selected ? parseInt(selected.value) : 0;
@@ -452,6 +461,7 @@ socket.on('roomJoined', (data) => {
     });
   } else {
     document.getElementById('host-controls').style.display = 'none';
+    if (addBotBtn) addBotBtn.style.display = 'none';
   }
 });
 
@@ -519,8 +529,9 @@ function isRedSuit(suit) {
 }
 function getRelativePosClass(idx, myIdx, maxPlayers) {
   if (maxPlayers === 2) return idx === myIdx ? 'pos-bottom' : 'pos-top';
+  // Ordem anti-horária: 0 -> bottom, 1 -> left, 2 -> top, 3 -> right
   const rel = (idx - myIdx + 4) % 4;
-  return ['pos-bottom', 'pos-right', 'pos-top', 'pos-left'][rel];
+  return ['pos-bottom', 'pos-left', 'pos-top', 'pos-right'][rel];
 }
 function canPlay(state) {
   return state.started &&
@@ -541,8 +552,9 @@ function renderWaiting(state) {
   list.innerHTML = state.players.map((p, i) => {
     const ready = p.connected && p.name && !p.name.startsWith('Jogador ');
     const dotClass = p.connected ? 'online' : 'offline';
+    const botMark = p.isBot ? ' 🤖' : '';
     return `<li class="${ready ? 'ok' : 'wait'}">
-      <span class="status-dot ${dotClass}"></span>${p.name}${p.connected ? '' : ' (offline)'}
+      <span class="status-dot ${dotClass}"></span>${p.name}${botMark}${p.connected ? '' : ' (offline)'}
     </li>`;
   }).join('');
 }
@@ -567,7 +579,7 @@ function renderGame(state) {
 
   const playable = canPlay(state);
 
-  // ----- Loop dos jogadores (com melhorias) -----
+  // ----- Loop dos jogadores -----
   state.players.forEach((p, idx) => {
     const div = document.createElement('div');
     const posClass = getRelativePosClass(idx, state.yourIndex, state.maxPlayers);
@@ -585,6 +597,7 @@ function renderGame(state) {
     if (isTurn) badges += '<span class="turn-badge">⭐ VEZ</span>';
     if (isMe) badges += ' 🧑‍🎓';
     if (isPartner) badges += ' 🤝';
+    if (p.isBot) badges += ' 🤖';
 
     const teamLabel = state.maxPlayers === 2
       ? 'Individual'
@@ -603,7 +616,7 @@ function renderGame(state) {
 
     const handDiv = document.getElementById(`hand-${idx}`);
 
-    // ----- 1. Ver cartas do parceiro (se permitido) -----
+    // Ver cartas do parceiro (se permitido)
     if (isPartner && state.canSeePartnerHand && state.partnerHand) {
       state.partnerHand.forEach(card => {
         const cardEl = document.createElement('div');
@@ -612,7 +625,7 @@ function renderGame(state) {
         handDiv.appendChild(cardEl);
       });
     }
-    // ----- 2. Jogador atual (eu) -----
+    // Jogador atual (eu)
     else if (isMe && state.yourHand) {
       state.yourHand.forEach(card => {
         const cardEl = document.createElement('div');
@@ -639,7 +652,7 @@ function renderGame(state) {
         handDiv.appendChild(cardEl);
       });
     }
-    // ----- 3. Demais jogadores (cartas ocultas) -----
+    // Demais jogadores (cartas ocultas)
     else {
       for (let i = 0; i < (p.cardCount || 0); i++) {
         const hidden = document.createElement('div');
@@ -649,11 +662,10 @@ function renderGame(state) {
     }
   });
 
-  // ----- Área central (com banner especial) -----
+  // ----- Área central -----
   const centerDiv = document.createElement('div');
   centerDiv.className = 'center-area';
 
-  // Banner especial (Mão de Ferro / Mão de Onze)
   let specialBannerHtml = '';
   if (state.specialHand === 'iron') {
     specialBannerHtml = `<div class="special-banner iron-banner">🔥 Mão de Ferro: jogando no escuro!</div>`;
@@ -720,8 +732,9 @@ function renderGame(state) {
   `;
   table.appendChild(centerDiv);
 
-  // Cartas jogadas na mesa
+  // Cartas jogadas na mesa (LIMPEZA EXPLÍCITA)
   const boardDiv = document.getElementById('board-cards');
+  if (boardDiv) boardDiv.innerHTML = '';
   if (state.rounds && state.rounds[state.currentRound]) {
     state.rounds[state.currentRound].cards.forEach(play => {
       const playedDiv = document.createElement('div');
@@ -758,13 +771,11 @@ function renderGame(state) {
     }
   }
 
-  // ----- Botões de ação (incluindo Mão de Onze) -----
+  // ----- Botões de ação -----
   const actionDiv = document.getElementById('action-buttons');
 
   // Decisão da Mão de Onze (prioridade máxima)
   if (state.waitingElevenDecision && state.elevenDecisionTeam === state.yourTeam) {
-    const actionDiv = document.getElementById('action-buttons');
-    // Botão "Ver cartas do parceiro" apenas em duplas (maxPlayers === 4)
     const showPartnerButton = state.maxPlayers === 4
       ? `<button class="btn" onclick="socket.emit('showHandToPartner')">👀 Ver cartas do parceiro (5s)</button>`
       : '';

@@ -1,17 +1,13 @@
 /**
  * Handlers relacionados ao gerenciamento de salas:
- *  - createRoom: cria uma nova sala e adiciona o jogador 0.
- *  - joinRoom: entra em uma sala existente como jogador ou espectador.
- *  - reconnectRoom: reconecta um jogador que perdeu a conexão usando token.
- *  - leaveRoom / disconnect: trata saída voluntária e desconexão.
- * Também contém a função handleDisconnect que verifica se a partida deve ser abortada.
+ *  - createRoom, joinRoom, reconnectRoom, leaveRoom, disconnect, addBot.
  */
 
 const { sanitizeName, generateToken } = require('../utils/helpers');
 const { isValidName, isValidRoomCode } = require('../utils/validators');
-const { sendStateToRoom, emitRoomMessage } = require('./utils');
+const { sendStateToRoom, emitRoomMessage, sendStateAndCheckBots } = require('./utils');
 
-module.exports = function roomHandlers(io, socket, roomManager) {
+module.exports = function roomHandlers(io, socket, roomManager, botManager) {
   const handleDisconnect = (socket, voluntary) => {
     console.log('Desconectado:', socket.id);
 
@@ -36,7 +32,8 @@ module.exports = function roomHandlers(io, socket, roomManager) {
 
         const game = room.game;
         if (game && game.started) {
-          const connectedCount = game.players.filter(p => p.connected).length;
+          const connectedCount = game.players.filter(p => p.connected && !p.isBot).length;
+          const totalPlayersNeeded = game.maxPlayers;
           if (connectedCount < 2) {
             game.abortGame();
             sendStateToRoom(io, roomManager, room);
@@ -47,7 +44,7 @@ module.exports = function roomHandlers(io, socket, roomManager) {
           sendStateToRoom(io, roomManager, room);
         }
 
-        const anyone = game.players.some(p => p.connected);
+        const anyone = game.players.some(p => p.connected && !p.isBot);
         if (!anyone && room.spectators.size === 0) {
           roomManager.deleteRoom(room.code);
           console.log('Sala encerrada:', room.code);
@@ -107,7 +104,7 @@ module.exports = function roomHandlers(io, socket, roomManager) {
     }
 
     const cleanName = sanitizeName(name, null);
-    const freeSlot = room.game.players.findIndex(p => !p.connected);
+    const freeSlot = room.game.players.findIndex(p => !p.connected && !p.isBot);
     if (freeSlot === -1) {
       socket.name = cleanName;
       socket.isSpectator = true;
@@ -200,5 +197,29 @@ module.exports = function roomHandlers(io, socket, roomManager) {
 
   socket.on('disconnect', () => {
     handleDisconnect(socket, false);
+  });
+
+  // Adicionar bot
+  socket.on('addBot', () => {
+    const room = roomManager.findRoomBySocket(socket.id);
+    if (!room) return;
+    if (room.hostId !== socket.id) {
+      socket.emit('toast', 'Apenas o criador pode adicionar bots.');
+      return;
+    }
+
+    const freeSlot = room.game.players.findIndex(p => !p.connected && !p.isBot);
+    if (freeSlot === -1) {
+      socket.emit('toast', 'Não há vagas disponíveis.');
+      return;
+    }
+
+    const bot = roomManager.createBot(room);
+    if (bot) {
+      emitRoomMessage(io, roomManager, room, `🤖 ${bot.name} entrou na sala!`);
+      sendStateAndCheckBots(io, roomManager, room, botManager);
+    } else {
+      socket.emit('toast', 'Não foi possível adicionar bot.');
+    }
   });
 };

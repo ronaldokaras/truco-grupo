@@ -8,9 +8,11 @@ const roomHandlers = require('./roomHandlers');
 const gameHandlers = require('./gameHandlers');
 const chatHandlers = require('./chatHandlers');
 const RateLimiter = require('../utils/rateLimiter');
+const BotManager = require('../game/BotManager');  // 🔹 bots
 
 const gameActionLimiter = new RateLimiter(10, 5000);   // ações de jogo
 const chatLimiter = new RateLimiter(5, 5000);          // mensagens de chat
+const botManager = new BotManager();                   // 🔹 bots
 
 module.exports = function setupSockets(io, roomManager) {
   // Inicia limpeza dos limitadores (opcional)
@@ -21,7 +23,7 @@ module.exports = function setupSockets(io, roomManager) {
     console.log('Conectado:', socket.id);
 
     roomHandlers(io, socket, roomManager);
-    gameHandlers(io, socket, roomManager, gameActionLimiter);
+    gameHandlers(io, socket, roomManager, gameActionLimiter, botManager); 
     chatHandlers(io, socket, roomManager, chatLimiter);
   });
 };
